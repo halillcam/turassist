@@ -1,4 +1,4 @@
-package com.example.turassist
+package com.natanzdev.turassist
 
 import io.flutter.embedding.android.FlutterActivity
 

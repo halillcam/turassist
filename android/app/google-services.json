@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "138121353976",
+    "project_id": "turassist-6fdc8",
+    "storage_bucket": "turassist-6fdc8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:138121353976:android:f633c63a1143590f8f790d",
+        "android_client_info": {
+          "package_name": "com.example.turassist"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAE9TEDgudXAWBnrNR_c3lrZdnNRrRZpRA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
