@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/tour_model.dart';
 import '../models/ticket_model.dart';
 import '../models/user_model.dart';
-import '../models/company_model.dart';
 import '../models/chat_model.dart';
 import '../models/announcement_model.dart';
 
@@ -12,7 +11,7 @@ class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // ==================== TOUR OPERATIONS ====================
-
+  // Aktif (silinmemiş) turları getirir
   Future<List<TourModel>> getActiveTours() async {
     try {
       final snapshot = await _firestore
@@ -22,184 +21,103 @@ class FirebaseService {
 
       return snapshot.docs.map((doc) => TourModel.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getActiveTours: $e');
+      print("Error fetching tours: $e");
       return [];
     }
   }
 
+  // Şehre göre filtreleme
   Future<List<TourModel>> getToursByCity(String city) async {
     try {
       final snapshot = await _firestore
           .collection('tours')
-          .where('isDeleted', isEqualTo: false)
           .where('city', isEqualTo: city)
+          .where('isDeleted', isEqualTo: false)
           .get();
 
       return snapshot.docs.map((doc) => TourModel.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getToursByCity: $e');
       return [];
     }
-  }
-
-  // ==================== TOUR OPERATIONS EKLER ====================
-
-  Future<List<String>> getServiceCities() async {
-    try {
-      final snapshot = await _firestore
-          .collection('tours')
-          .where('isDeleted', isEqualTo: false)
-          .get();
-
-      final cities = snapshot.docs
-          .map((d) => (d.data()['city'] ?? '') as String)
-          .where((c) => c.isNotEmpty)
-          .toSet()
-          .toList();
-
-      return cities;
-    } catch (e) {
-      print('Error getServiceCities: $e');
-      return [];
-    }
-  }
-
-  Stream<List<TourModel>> publicToursByCompany(String companyId) {
-    return _firestore
-        .collection('tours')
-        .where('companyId', isEqualTo: companyId)
-        .where('isDeleted', isEqualTo: false)
-        .snapshots()
-        .map((snap) => snap.docs.map((doc) => TourModel.fromFirestore(doc)).toList());
   }
 
   // ==================== TICKET & QR OPERATIONS ====================
-
+  // Bilet oluşturma
   Future<String?> createTicket(TicketModel ticket) async {
     try {
-      // BookingController.checkAccessForTour ile uyumlu ID
-      final ticketId = '${ticket.userId}_${ticket.tourId}';
-      final docRef = _firestore.collection('tickets').doc(ticketId);
-
-      final data = ticket.toJson();
-      data['id'] = ticketId;
-
-      await docRef.set(data);
-      return ticketId;
+      final docRef = _firestore.collection('tickets').doc();
+      await docRef.set(ticket.toJson());
+      return docRef.id;
     } catch (e) {
-      print('Error createTicket: $e');
       return null;
     }
   }
 
+  // Rehberin QR okutma işlemi (Security Rules uyumlu: isScanned & scannedAt)
   Future<bool> updateTicketQRStatus(String ticketId) async {
     try {
-      final docRef = _firestore.collection('tickets').doc(ticketId);
-      final snap = await docRef.get();
-      if (!snap.exists) return false;
-
-      await docRef.update({
+      await _firestore.collection('tickets').doc(ticketId).update({
         'isScanned': true,
         'status': 'checked_in',
         'scannedAt': FieldValue.serverTimestamp(),
       });
       return true;
     } catch (e) {
-      print('Error updateTicketQRStatus: $e');
+      print("QR Scan Error: $e");
       return false;
     }
   }
 
-  Future<TourModel?> getTourById(String tourId) async {
+  Future<bool> updateTicketStatus(String ticketId, String newStatus) async {
     try {
-      final doc = await _firestore.collection('tours').doc(tourId).get();
-      if (!doc.exists) return null;
-      return TourModel.fromFirestore(doc);
+      await _firestore.collection('tickets').doc(ticketId).update({
+        'status': newStatus,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
     } catch (e) {
-      print('Error getTourById: $e');
-      return null;
-    }
-  }
-
-  Future<List<TicketModel>> getTourTickets(String tourId) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tickets')
-          .where('tourId', isEqualTo: tourId)
-          .get();
-
-      return snapshot.docs.map((d) => TicketModel.fromFirestore(d)).toList();
-    } catch (e) {
-      print('Error getTourTickets: $e');
-      return [];
-    }
-  }
-
-  Future<List<TicketModel>> getUserTickets(String userId) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tickets')
-          .where('userId', isEqualTo: userId)
-          .get();
-
-      return snapshot.docs.map((d) => TicketModel.fromFirestore(d)).toList();
-    } catch (e) {
-      print('Error getUserTickets: $e');
-      return [];
-    }
-  }
-
-  Future<TicketModel?> getTicketById(String ticketId) async {
-    try {
-      final doc = await _firestore.collection('tickets').doc(ticketId).get();
-      if (!doc.exists) return null;
-      return TicketModel.fromFirestore(doc);
-    } catch (e) {
-      print('Error getTicketById: $e');
-      return null;
-    }
-  }
-
-  Future<void> updateUser(String userId, Map<String, dynamic> data) async {
-    try {
-      await _firestore.collection('users').doc(userId).set(data, SetOptions(merge: true));
-    } catch (e) {
-      print('Error updateUser: $e');
+      print("Ticket Status Update Error: $e");
+      return false;
     }
   }
 
   // ==================== CHAT & ANNOUNCEMENT ====================
-
+  // Mesaj gönderimi (Sadece tourId ve ChatModel alır)
   Future<void> sendChatMessage(String tourId, ChatModel message) async {
     try {
       await _firestore.collection('tours').doc(tourId).collection('messages').add(message.toJson());
     } catch (e) {
-      print('Error sendChatMessage: $e');
+      print("Chat Error: $e");
     }
   }
 
-  Future<void> createAnnouncement(String tourId, AnnouncementModel announcement) async {
-    try {
-      final colRef = _firestore.collection('tours').doc(tourId).collection('announcements');
-      final docRef = colRef.doc();
-      final data = announcement.toJson();
-      data['id'] = docRef.id;
-      await docRef.set(data);
-    } catch (e) {
-      print('Error createAnnouncement: $e');
-    }
-  }
-
+  // Mesajları dinle (Stream)
   Stream<List<ChatModel>> getChatMessages(String tourId) {
     return _firestore
         .collection('tours')
         .doc(tourId)
         .collection('messages')
-        .orderBy('timestamp')
+        .orderBy('timestamp', descending: false)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => ChatModel.fromFirestore(d)).toList());
+        .map((snapshot) {
+          return snapshot.docs.map((doc) => ChatModel.fromFirestore(doc)).toList();
+        });
   }
 
+  // Duyuru oluşturma
+  Future<void> createAnnouncement(String tourId, AnnouncementModel announcement) async {
+    try {
+      await _firestore
+          .collection('tours')
+          .doc(tourId)
+          .collection('announcements')
+          .add(announcement.toJson());
+    } catch (e) {
+      print("Announcement Error: $e");
+    }
+  }
+
+  // Duyuruları dinle (Stream)
   Stream<List<AnnouncementModel>> getAnnouncements(String tourId) {
     return _firestore
         .collection('tours')
@@ -207,50 +125,34 @@ class FirebaseService {
         .collection('announcements')
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => AnnouncementModel.fromFirestore(d)).toList());
+        .map((snapshot) {
+          return snapshot.docs.map((doc) => AnnouncementModel.fromFirestore(doc)).toList();
+        });
   }
 
   // ==================== AUTH & AUTHORIZATION ====================
-
+  // SaaS Yetki Kontrolü
   Future<bool> isAuthorizedForCompany(String userId, String companyId) async {
     final userDoc = await _firestore.collection('users').doc(userId).get();
     if (!userDoc.exists) return false;
-    final data = userDoc.data()!;
-    final single = data['companyId'] as String?;
-    final list = (data['companyIds'] as List?)?.cast<String>() ?? <String>[];
-    return single == companyId || list.contains(companyId);
+
+    final user = UserModel.fromFirestore(userDoc);
+    if (user.role == 'super_admin') return true;
+    return user.registeredCompanies.contains(companyId);
   }
 
+  // Giriş ve Yetki Kontrolü
   Future<UserModel?> loginAndCheckAuth(String email, String password, String companyId) async {
-    try {
-      final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
-      final user = cred.user;
-      if (user == null) return null;
+    final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
+    final userId = cred.user!.uid;
 
-      final allowed = await isAuthorizedForCompany(user.uid, companyId);
-      if (!allowed) {
-        await _auth.signOut();
-        throw Exception('Bu firmaya erişim yetkiniz yok');
-      }
-
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
-      if (!userDoc.exists) return null;
-      return UserModel.fromFirestore(userDoc);
-    } catch (e) {
-      print('Error loginAndCheckAuth: $e');
-      rethrow;
+    final authorized = await isAuthorizedForCompany(userId, companyId);
+    if (!authorized) {
+      await _auth.signOut();
+      throw Exception("Bu şirket paneline giriş yetkiniz yok.");
     }
-  }
 
-  Future<UserModel?> signInWithCompanyAuthorization({
-    required String email,
-    required String password,
-    required String companyId,
-  }) {
-    return loginAndCheckAuth(email, password, companyId);
-  }
-
-  Future<void> signOut() async {
-    await _auth.signOut();
+    final doc = await _firestore.collection('users').doc(userId).get();
+    return UserModel.fromFirestore(doc);
   }
 }
