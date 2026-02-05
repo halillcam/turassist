@@ -87,7 +87,42 @@ class TourModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  factory TourModel.fromJson(Map<String, dynamic> json, {String? id}) {
+    List<DateTime> parseDates(dynamic list) {
+      final raw = (list as List?) ?? [];
+      return raw.map((e) {
+        if (e is Timestamp) return e.toDate();
+        if (e is String) return DateTime.tryParse(e) ?? DateTime.now();
+        if (e is int) return DateTime.fromMillisecondsSinceEpoch(e);
+        return DateTime.now();
+      }).toList();
+    }
+
+    return TourModel(
+      id: id ?? (json['id'] ?? ''),
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      price: (json['price'] ?? 0).toDouble(),
+      companyId: json['companyId'] ?? '',
+      guideId: json['guideId'] ?? '',
+      guideName: json['guideName'],
+      availableDates: parseDates(json['availableDates']),
+      capacity: json['capacity'] ?? 0,
+      departureCity: json['departureCity'] ?? '',
+      destinationCity: json['destinationCity'] ?? '',
+      busInfo: BusInfo.fromMap((json['busInfo'] as Map<String, dynamic>?) ?? {}),
+      createdAt: (json['createdAt'] is Timestamp)
+          ? (json['createdAt'] as Timestamp).toDate()
+          : (json['createdAt'] is String)
+          ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
+          : (json['createdAt'] is int)
+          ? DateTime.fromMillisecondsSinceEpoch(json['createdAt'] as int)
+          : DateTime.now(),
+      isActive: json['isActive'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'title': title,
       'description': description,
@@ -95,12 +130,12 @@ class TourModel {
       'companyId': companyId,
       'guideId': guideId,
       'guideName': guideName,
-      'availableDates': availableDates,
+      'availableDates': availableDates.map((d) => Timestamp.fromDate(d)).toList(),
       'capacity': capacity,
       'departureCity': departureCity,
       'destinationCity': destinationCity,
       'busInfo': busInfo.toMap(),
-      'createdAt': createdAt,
+      'createdAt': Timestamp.fromDate(createdAt),
       'isActive': isActive,
     };
   }

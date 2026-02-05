@@ -8,7 +8,7 @@ class TicketModel {
   final String tcNo;
   final DateTime selectedDate;
   final double pricePaid;
-  final String status; // 'active', 'completed', 'cancelled'
+  final String status; // 'active', 'checked_in', 'completed', 'cancelled'
   final String? qrCode;
   final bool qrScanned;
   final DateTime purchaseDate;
@@ -47,19 +47,56 @@ class TicketModel {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  factory TicketModel.fromJson(Map<String, dynamic> json, {String? id}) {
+    return TicketModel(
+      id: id ?? (json['id'] ?? ''),
+      tourId: json['tourId'] ?? '',
+      userId: json['userId'] ?? '',
+      passengerName: json['passengerName'] ?? '',
+      tcNo: json['tcNo'] ?? '',
+      selectedDate: (json['selectedDate'] is Timestamp)
+          ? (json['selectedDate'] as Timestamp).toDate()
+          : (json['selectedDate'] is String)
+          ? DateTime.tryParse(json['selectedDate'] as String) ?? DateTime.now()
+          : (json['selectedDate'] is int)
+          ? DateTime.fromMillisecondsSinceEpoch(json['selectedDate'] as int)
+          : DateTime.now(),
+      pricePaid: (json['pricePaid'] ?? 0).toDouble(),
+      status: json['status'] ?? 'active',
+      qrCode: json['qrCode'],
+      qrScanned: json['qrScanned'] ?? false,
+      purchaseDate: (json['purchaseDate'] is Timestamp)
+          ? (json['purchaseDate'] as Timestamp).toDate()
+          : (json['purchaseDate'] is String)
+          ? DateTime.tryParse(json['purchaseDate'] as String) ?? DateTime.now()
+          : (json['purchaseDate'] is int)
+          ? DateTime.fromMillisecondsSinceEpoch(json['purchaseDate'] as int)
+          : DateTime.now(),
+      scanDate: json['scanDate'] == null
+          ? null
+          : (json['scanDate'] is Timestamp)
+          ? (json['scanDate'] as Timestamp).toDate()
+          : (json['scanDate'] is String)
+          ? DateTime.tryParse(json['scanDate'] as String)
+          : (json['scanDate'] is int)
+          ? DateTime.fromMillisecondsSinceEpoch(json['scanDate'] as int)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
     return {
       'tourId': tourId,
       'userId': userId,
       'passengerName': passengerName,
       'tcNo': tcNo,
-      'selectedDate': selectedDate,
+      'selectedDate': Timestamp.fromDate(selectedDate),
       'pricePaid': pricePaid,
       'status': status,
       'qrCode': qrCode,
       'qrScanned': qrScanned,
-      'purchaseDate': purchaseDate,
-      'scanDate': scanDate,
+      'purchaseDate': Timestamp.fromDate(purchaseDate),
+      'scanDate': scanDate != null ? Timestamp.fromDate(scanDate!) : null,
     };
   }
 }

@@ -1,8 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart'; // GetX paketini ekledik
-import 'package:turassist/firebase_options.dart'; // Bu import çok önemli!
-import 'package:turassist/screens/login_screen.dart';
+import 'package:get/get.dart';
+import 'package:turassist/firebase_options.dart';
+import 'package:turassist/config/app_routes.dart';
+import 'package:turassist/config/colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,10 +22,12 @@ class MyApp extends StatelessWidget {
       title: 'TurAssist',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
         useMaterial3: true,
+        scaffoldBackgroundColor: AppColors.darkBackground,
       ),
-      home: const LoginScreen(),
+      initialRoute: AppRoutes.tourList,
+      getPages: AppPages.routes,
     );
   }
 }
