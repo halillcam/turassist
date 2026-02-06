@@ -1,0 +1,145 @@
+------ TurAssist projesi kısa özet -------
+- TurAssist Nedir 
+TurAssist yerel tur fimaları için geliştirilmiş bir mobil uygulamadır
+amacı yerel tur firmaları ve müşterileri için rahat bir tur ortamı oluşturmak ve piyasadaki bu açığı kapatmak için düşünülmüş bir uygulamadır
+
+- Uygulama Özellikleri
+Kullanıcı app i ilk indirip açtığında ister giriş yapsın ister yapmasın tek seferlik bir şehir seçimi istenecektir.
+bu sayede kullanıcının bulunduğu şehirdeki turlar ve o turların firmalarını görebilecektir.
+Kullanıcı tur satın almak isterse ilgili tur un detay ekranında tur u satın butonuna basması yeterlidir
+eğer kullanıcı tur satın alırsa ve işlem başarılı olursa kullanıcıya ve o satın aldığı tur a özel bir QR kod verilecektir
+bu QR kod kullanıcının tur için giriş kartıdır.
+Kullanıcı bu QR kod u tur günü geldiğinde tur otobüsüne binerken tur sorumlusuna okutacaktır.
+Kullanıcı tur sorumlusuna QR kodunu okuttuğunda kullanıcı için app arayüzde yeni bir tab aktif olacaktır bu tab de tur'un ekstra bilgileri,
+rehber bilgileri, Chat yapma bölümleri olacaktır
+Chat ı diğer kullanıcılarla Rehber ile tur sorumlusu ile yapabilir. Burada kullanıcının sadece ismi ve soy ismi görünür diğer bilgileri saklanır.
+Kullanıcı QR ını okutmayıp tur un belirlenen iptal tarihinden önce biletini iptal etmek isterse Turlarım sekmesinden ilgili tur u seçip iptal et butonuna basabilir.
+
+Tur sorumlusuna özel ilgili tur için bir id pw oluşturulur bu id pw bilgisi tur sorumlusuna iletilir, bu sayede tur sorumlusu ilgili id pw ile eşleşmiş tur paneline giriş yapabilir. Burada Tur a katılan ve QR ını okutan kullanıcılarla chat yapabilir, Yine QR ını okutan katılımcılara bildirim gönderebilir, ve tur u bitirebilir turu bitirme butonuna basar ve tur bitirme talebi direkt şirket in kullanıdığı panel in bildirim ekranına düşer tur iptalini tur u düzenleyen şirket onaylayabilir. Tur bitişinde QR kodlar pasif hale gelir bu sayede 1 den fazla kez kullanmanın önüne geçilir.
+
+Ekranlar (normal user ve Tur sorumlusu için)
+Login page,
+City choice page,
+tour list page,
+tour detail page,
+payment page -> onay ekranı
+normal user page,
+my tours page -> chat page, rezervasyonu u iptal et
+my QR's page,
+
+Tur Sorumlusu ekranı:
+Login page,
+My tour page -> customers, announcements page, finish the tour page, chat page,
+
+
+---------------------- TurAssists Detay ----------------------------------
+
+kullanıcı app i ilk açtığında guest olacak eğer tur satın almak isterse bottomapp bar daki profil ekranına basıp oradan giriş yapabilecek.
+guest payment ekranına kadar olan tüm ekranları görebilecek (login, choice city, tour list, tour detail page)
+kullanıcı ilk kez giriş yaptığında bu giriş bilgisi kaydedilecek kullanıcı localinde tutulacak (securedSharedPreferences ile)
+kullanıcı giriş yaptığında şehir seçip seçmediği kontrol edilecek eğer seçmemişse şehir seçebilecek değiştirmek isterse app bar in altında combobox tarzı bir yapı olacak oradan değiştirebilir.
+kullanıcının şehir şeçimine göre tur lar listelenecek
+örneğin kullanıcı Kahramanmaraş ı seçtiyse Kahramanmaraş çıkışlı turlar listelenecek.
+kullanıcı ilgili tur un detay ına girdiğinde tur la ilgili bilgiler olacak (tarihler çıkış saatleri ve kontenjan bilgisi her tarihe özel kontenjan bilgileri gösterilecek ve bu bilgiler sürekli güncellenecek)
+Kullanıcı ilgili tur un detayında tarih seçtiyse ve kontenjan da varsa satın al butonu pasif ten aktif e dönecek.
+kullanıcı satın al butonuna bastığında payment ekranı açılacak ve orada 3d secure bir şekilde ödeme yapabilecek.
+kullanıcı ödemesi başarılı olursa bottomappbar da 2 yeni sekme açılacak, birisi Turlarım diğeri de QR larım.
+Turlarım ekranında kullanıcının satın aldığı tur a ait ekstra bilgiler olacak (tur sorumlusu adı soy adı telefon no su, rehber adı soy adı, bindiği otobüs un plakası, chat yap butonu ve iptal et butonu)
+QR'larım ekranında ilgili tur un QR kod u görünecek kullanıcı deneyimi için hemen QR ını bulup okutsun diye.
+profil ekranında kullanıcının bilgileri ve şifre değiştir bölümü, bilgilerimi güncelle bölümü olacak.
+
+Tur Sorumlusu tarafı:
+Tur sorumlusu kendisine şirketin verdiği id pw ile app e giriş yapacak.
+Giriş yaptığında app bar da tur un title ı olacak.
+ana sayfasında katılımcıları göster, bildirim gönder, chat yap bölümü, app bar actions da tur u bitir butonu olacak bottom app barda QR oku bölümü olacak.
+tur sorumlusu QR oku bölümüne bastığında app in kamerası açılacak ve QR ları okutacak QR okuttuğunda ilgili kullanıcının ad soyad bilgileri Alert Dialog ile önüne gelecek.
+mesela Melisa müşterisinin QR ını okuttu onun adı ve soy adını görebilecek okey e bastığında kamera ya tekrardan dönecek ve diğer QR ları okuyabilecek.
+katılımcıları göster panelinde Tur satın alanları görebilecek, QR ını okutanların isimleri yeşil olarak görünecek okutmayanların kırmızı olarak görünecek
+bu sayede QR okutan ve okutmayanları tespit edebilecek ve Okutamayanlarla iletişime geçebilecek mesela Merve QR ını okutmadı onu arayıp nerede olduğunu tur un başlayabileceğini bildirebilecek. 
+Bildirim ekranında Container içinde bir text yapısı olacak ve oraya yazıp bildirim gönder butonuna bastığında QR ını okutan katılımcıların telefonlarına bildirim gönderebilecek
+mesela "Arkadaşlar Saat 9 da otelden çıkış yapacağız lütfen o saatte herkes loby de olsun" gibi
+chat ekranında tur katılımcıları ile chat yapabilecek.
+Tur u bitir buttonuna bastığında şirketin admin paneline bir bildirim gidecek ve o tarafı şirket halledecek onay yada declined verecek.
+eğer şirket bitir onayı verirse QR lar pasif e düşecek yada silinecek + o tur için oluşturulan tur sorumlusu id pw si de silinecek.
+
+
+------------ TurAssists Detayın detayı ------------------------
+ödeme tarafında Pazar yeri model i kullanılacak
+şirket e app e kayıt olurken ıban vergi no gibi Ödeme altyapılarının istediği bilgiler girilecek (bu bilgiler admin panelinden girilecek)
+bu bilgiler doğruysa ödeme altyapısı bize SubMerchantkey vericek bu bizim ödeme altyapısına gönderdiğimiz şirkete ait özel bir id numarasıdır
+kullanıcı satın al a bastığında app firebase e gidecek tur un fiyatının ve şirketin "SuberMerchantkey" bilgisini çekecek ve kullanıcı ödemeyi onaylarsa ve işlem başarılı olursa komisyon oranına göre "Submerchantkey" ile ilgili şirketin hesabına para otomatik olarak geçecek. not : ödemede 3D secure kullanılacak.
+
+eğer ödeme başarılı olursa ilgili kullanıcı için bir QR kod oluşturulacak.
+
+QR kod unique olacak oluşturulan QR içine bir token gömülecek bu sayede aynı QR ı iki kez okutmanın önüne geçilecek.
+
+--------------- TurAssists Admin panelleri -----------------
+2 tane admin paneli olacak ve bunlar web tabanlı olarak ayrı bir proje dosyasında oluşturulacaklar.
+birisi şirketler için olan AdminPanel olacak.
+bu Admin panel içerisinde:
+- Tur İşlemleri => Tur ekle,sil,güncelle, Tur sorumlusu oluştur,katılımcı ekle, tur bilgilerini gör,tur a katılanları gör,geçmiş tur ları gör, kullanıcı QR ını güncelle.
+- Ticket oluştur
+- ticketlarım
+- Bildirimler
+- Ödeme bilgilerim - Ödeme bilgilerimi güncelle
+- Ayarlar -> id pw güncelle
+
+Tur ekleme ekranında : 
+Çıkış şehri, Tur title ı, description ı, kontenjanı, tarihi yada tarihleri (aynı turdan birden fazla olabilir) araç bilgileri, Rehber bilgileri, fiyatı
+Tur sil tarafı oluşturulan tur a atanan id yi seçerek silinebilir,
+
+tur güncelle tarafı:
+oluşturulan turlar görünür ilgili tur seçilir tur ekleme ekranındaki gibi bilgiler çıkar değiştirilirse tur u güncelle butonu pasif ten aktif e gelir ve admin o butona bastığında alert mesajı çıkar ve onay verirse güncellenir.
+
+tur sorumlusu oluştur tarafı:
+oluşturulan turlar görünür ilgili tur a tıklandığında id,pw, sorumlu ad soyad bilgileri girilir ve tur sorumlusu oluştur butonu pasif ten aktif e döner ve admin o buton a basınca alert mesajı çıkar ve onay verirse tur sorumlusu oluşturulur
+
+Kritik : Eğer admin tur u silmek isterse ve içeride müşteri kayıtlıysa yani tur satın almışsa o müşterinin satın alma bilgileri ödeme altyapısına gider ve parası iade edilir. bu sayede şirket dolandırıcılığının önüne geçilir.
+
+Ticket oluştur tarafı:
+combobox ta ilgili sorun seçilir mesaj yazılır ve ticket oluştur butonuna basınca o ticket super admin e gider ticket larım ekranında oluşturulan ticket görünür.
+
+ödeme bilgileri ekranında:
+ödeme altyapısının şirketten istediği bilgiler tutulur (vergi no vs)
+
+Tur katılımcılarını göster : 
+burada o şirket ten tur satın almış kullanıcıların bilgileri görünür. tur a katılıp katılmadıkları yeşil ve kırmızı renkle gösterilir.
+
+
+------- Super admin tarafı -----
+şirket e ait bütün yetkiler burada da olacak orası bir sorunda burası yardım edecek.
+
+- Şirket oluştur ekranı
+- şirket güncelle ekranı
+- Kayıtlı şirketleri gör
+- Tur oluştur (normal şirket adminindeki tur oluşturma yetkisiyle aynı, fakat burada tur şirketide seçilecek)
+- Şirketlere bildirim gönder.
+- kullanıcı QR ı güncelle
+- tur sorumlusu oluştur
+- tur katılımcısı oluştur
+- bildirim gönder
+
+Şirket oluştur tarafı:
+şirket title ı, id pw oluşturma textfield ları olacak ve oluştur butonuna basınca girilen bilgiler alert ile ekranda görünecek
+
+Şirket güncelle tarafı: 
+kayıtlı şirketler listesi çekilecek ve ilgili şirket seçilecek oradan güncellenebilecek yine onay butonu olacak ve alert ile ekranda güncellenmiş bilgiler görünecek
+
+tur oluştur tarafı:
+combobox ile kayıtlı şirketler çekilecek, şirket şeçilecek ve tur bilgileri girilecek (şirket admin paneli ile aynı olacak)
+
+kullanıcı QR ı oluştur, tur sorumlusu oluştur, tur katılımcısı oluştur:
+bu 3 bölümde de aynı tur oluştur daki gibi önce combobox ile şirket şeçilecek ve gerekli bilgiler girilecek (ne oluşturulmak isteniyorsa)
+
+bildirim gönder tarafı:
+sisteme kayıtlı şirketlere bildirim gönderebilecek app güncellemesi yapıldı vs
+
+
+
+Not : admin ve superadmin panelleri için ileride log kayıtlarının tutulup gösterildiği bir alan yapılabilir
+
+
+
+
+
+
