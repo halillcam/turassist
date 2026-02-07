@@ -57,7 +57,7 @@
 
 **İşlemler:**
 - Tur İşlemleri:
-  - ✅ Tur ekle (şehir, başlık, açıklama, kontenjan, tarih/saatler, araç, rehber, fiyat) [cite: 44]
+  - ✅ Tur ekle (şehir, başlık, açıklama, kontenjan, tarih/saatler, araç, rehber, fiyat, **region seçimi**) [cite: 44]
   - ✅ Tur sil (katılımcılı turda otomatik para iadesi) [cite: 49]
   - ✅ Tur güncelle [cite: 46]
   - ✅ Tur sorumlusu oluştur (ID/PW otomatik) [cite: 47, 18]
@@ -84,7 +84,7 @@
 - ✅ Şirket oluştur (ad, id, pw otomatik) [cite: 60]
 - ✅ Şirket güncelle [cite: 61]
 - ✅ Kayıtlı şirketleri göster
-- ✅ Tur oluştur (şirket seçerek) [cite: 62]
+- ✅ Tur oluştur (şirket seçerek, **region seçimi ile**) [cite: 62]
 - ✅ Tur sorumlusu oluştur [cite: 64]
 - ✅ Tur katılımcısı oluştur [cite: 64]
 - ✅ Şirketlere bildirim gönder [cite: 65]
@@ -219,6 +219,7 @@ Rehber "Turu Bitir" →
   "guideId": "guide_id",
   "guideName": "Rehber Adı",
   "capacity": 30,
+  "region": "Marmara",
   "busInfo": {
     "driverName": "Şoför Adı",
     "phoneNumber": "05xxxxxxxxx",
@@ -230,6 +231,22 @@ Rehber "Turu Bitir" →
   "status": "active" | "finish_requested"
 }
 ```
+
+### Region Kategorileri
+Turlar aşağıdaki bölgelere göre kategorize edilecektir:
+
+**Coğrafi Bölgeler:**
+- Akdeniz
+- Karadeniz
+- Marmara
+- Ege
+- İç Anadolu
+- Doğu Anadolu
+- Güneydoğu Anadolu
+
+**Özel Kategoriler:**
+- Günü Birlik
+- Yurtdışı
 
 ### tickets
 ```json
@@ -333,6 +350,27 @@ Web Projects (Ayrı):
 
 1. **Screens/UI Geliştirme (Mobile)**
    - Guest → Tour List Page
+     - **Görünüş:** Bölgelere göre kategorize edilmiş turlar
+     - **Örnek:**
+       ```
+       📌 KARADENIZ
+       ├── Tur 1: Rize Çay Bahçesi Turu
+       ├── Tur 2: Uzungöl Turu
+       └── Tur 3: Sumela Manastırı Turu
+       
+       📌 EGE
+       ├── Tur 1: Efes Antik Şehir
+       ├── Tur 2: Pamukkale Turu
+       └── Tur 3: Bodrum Tekne Turu
+       
+       📌 GÜNÜ BİRLİK
+       ├── Tur 1: Kısa Getaway
+       └── Tur 2: Half Day Tour
+       
+       📌 YURTDIŞI
+       ├── Tur 1: Yunanistan Adalar Turu
+       └── Tur 2: Kıbrıs Hamamı Turu
+       ```
    - Customer → My Tours, QR's, Profile Pages
    - Guide → Dashboard, QR Reader, Chat, Announcement Pages
 
