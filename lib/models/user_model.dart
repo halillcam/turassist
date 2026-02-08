@@ -10,8 +10,8 @@ class UserModel {
   final List<String> registeredCompanies; //
   final String tcNo;
   final String? profileImage;
-  final String selectedCity; // Eksik olan şehir tercihi eklendi
-  final bool isDeleted; // Firestore ile isim birliği sağlandı
+  final String selectedCity;
+  final bool isDeleted;
   final DateTime createdAt;
 
   UserModel({

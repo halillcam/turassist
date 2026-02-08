@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.darkBackground,
       ),
-      initialRoute: AppRoutes.tourList,
+      initialRoute: AppRoutes.login,
       getPages: AppPages.routes,
     );
   }

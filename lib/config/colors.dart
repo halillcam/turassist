@@ -2,14 +2,31 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Primary Colors
-  static const Color primary = Color(0xFFf48525); // Turuncu (HTML'den)
+  static const Color primary = Color(0xFF137fec); // Mavi (Auth ekranlarından)
   static const Color primaryDark = Color(0xFFd66e12); // Koyu turuncu
   static const Color primaryLight = Color(0xFFFF8A5B);
+
+  // Background Colors - Android/City Selection
+  static const Color backgroundLight = Color(0xFFF6F7F8);
+  static const Color backgroundDark = Color(0xFF101922);
 
   // Dark Colors
   static const Color darkBackground = Color(0xFF221810); // HTML'deki background-dark
   static const Color darkSurface = Color(0xFF2c241b); // HTML'deki surface-dark
   static const Color darkCard = Color(0xFF3A3A3A);
+  static const Color cardDark = Color(0xFF1a2632); // Tour detail card bg
+  static const Color greenAccent = Color(0xFF22c55e); // Neler dahil icon color
+
+  // Slate Colors
+  static const Color slate900 = Color(0xFF0f172a);
+  static const Color slate800 = Color(0xFF1e293b);
+  static const Color slate700 = Color(0xFF334155);
+  static const Color slate600 = Color(0xFF475569);
+  static const Color slate500 = Color(0xFF64748b);
+  static const Color slate400 = Color(0xFF94a3b8);
+  static const Color slate300 = Color(0xFFcbd5e1);
+  static const Color slate200 = Color(0xFFe2e8f0);
+  static const Color slate100 = Color(0xFFf1f5f9);
 
   // Secondary Colors
   static const Color secondary = Color(0xFF4A90E2); // Mavi
