@@ -85,6 +85,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
+                    const SizedBox(height: 8),
+
+                    // TEST BUTTON - Tur Ekleme Ekranı - TO BE REMOVED
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Get.toNamed('/test-tour'),
+                        icon: const Icon(Icons.science, color: Colors.white, size: 18),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurple.withOpacity(0.8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        label: const Text(
+                          'TEST: Tur Verisi Ekle (Firestore)',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+
                     const SizedBox(height: 16),
                   ],
                 ),

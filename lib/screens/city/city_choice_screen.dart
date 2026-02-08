@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:turassist/config/colors.dart';
 import 'package:turassist/config/app_routes.dart';
 import 'package:turassist/models/city_model.dart';
+import 'package:turassist/controllers/city_controller.dart';
+import 'package:turassist/controllers/tour_controller.dart';
 import 'dart:ui';
 
 class CityChoiceScreen extends StatefulWidget {
@@ -119,6 +121,10 @@ class _CityChoiceScreenState extends State<CityChoiceScreen> with TickerProvider
           child: ElevatedButton(
             onPressed: _selectedCityName.value != null
                 ? () {
+                    // Seçilen şehri CityController'a gönder, o da TourController'ı tetikler
+                    final cityController = Get.put(CityController());
+                    Get.put(TourController()); // TourController'ı önceden register et
+                    cityController.updateCity(_selectedCityName.value!);
                     Get.toNamed(AppRoutes.tourList);
                   }
                 : null,

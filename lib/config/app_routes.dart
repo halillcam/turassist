@@ -5,6 +5,7 @@ import '../screens/auth/signup_screen.dart';
 import '../screens/city/city_choice_screen.dart';
 import '../screens/tour/tour_list_screen.dart';
 import '../screens/tour/tour_detail_screen.dart';
+import '../screens/test/test_tour_screen.dart';
 
 abstract class AppRoutes {
   static const String login = '/login';
@@ -15,6 +16,7 @@ abstract class AppRoutes {
   static const String guideDashboard = '/guide-dashboard';
   static const String tourList = '/tour-list';
   static const String tourDetail = '/tour-detail';
+  static const String testTour = '/test-tour'; // 🧪 Test - sonra silinecek
 }
 
 class AppPages {
@@ -54,6 +56,12 @@ class AppPages {
       name: AppRoutes.tourDetail,
       page: () => TourDetailScreen(tour: Get.arguments),
       transition: Transition.rightToLeft,
+    ),
+    // 🧪 Test route - sonra silinecek
+    GetPage(
+      name: AppRoutes.testTour,
+      page: () => const TestTourScreen(),
+      transition: Transition.fadeIn,
     ),
   ];
 }

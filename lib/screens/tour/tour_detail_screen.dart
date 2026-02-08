@@ -142,27 +142,66 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               Container(height: 1, color: AppColors.slate800),
               const SizedBox(height: 20),
 
-              // Capacity info
-              Column(
+              // Capacity & Company info
+              Row(
                 children: [
-                  const Icon(Icons.group, color: AppColors.primary, size: 24),
-                  const SizedBox(height: 6),
-                  Text(
-                    'KAPASİTE',
-                    style: TextStyle(
-                      color: AppColors.slate500,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
+                  // Kapasite
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Icon(Icons.group, color: AppColors.primary, size: 24),
+                        const SizedBox(height: 6),
+                        Text(
+                          'KAPASİTE',
+                          style: TextStyle(
+                            color: AppColors.slate500,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${tour.capacity} Kişi',
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${tour.capacity} Kişi',
-                    style: const TextStyle(
-                      color: AppColors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                  // Ayırıcı
+                  Container(width: 1, height: 60, color: AppColors.slate800),
+                  // Tur Firması
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Icon(Icons.business, color: AppColors.primary, size: 24),
+                        const SizedBox(height: 6),
+                        Text(
+                          'TUR FİRMASI',
+                          style: TextStyle(
+                            color: AppColors.slate500,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          tour.companyId,
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                   ),
                 ],

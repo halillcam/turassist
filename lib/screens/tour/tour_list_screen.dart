@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:turassist/config/colors.dart';
 import 'package:turassist/controllers/tour_controller.dart';
+import 'package:turassist/controllers/city_controller.dart';
 import 'package:turassist/models/tour_model.dart';
+import 'package:turassist/models/city_model.dart';
 import 'package:turassist/widgets/index.dart';
 
 class TourListScreen extends StatefulWidget {
@@ -14,6 +16,7 @@ class TourListScreen extends StatefulWidget {
 
 class _TourListScreenState extends State<TourListScreen> {
   final TourController _tourController = Get.put(TourController());
+  final CityController _cityController = Get.put(CityController());
   late TextEditingController _searchController;
   late Rx<String> _searchQuery;
 
@@ -23,6 +26,29 @@ class _TourListScreenState extends State<TourListScreen> {
     _searchController = TextEditingController();
     _searchQuery = Rx<String>('');
     _searchController.addListener(_onSearchChanged);
+
+    // Sayfa yenilendiğinde turlar boşsa local'den şehir oku ve turları çek
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (_tourController.tours.isEmpty) {
+        // Önce controller'daki şehri kontrol et
+        var city = _cityController.selectedCity.value;
+
+        // Controller'da yoksa local'den oku
+        if (city.isEmpty) {
+          final savedCity = await _cityController.getSavedCity();
+          if (savedCity != null && savedCity.isNotEmpty) {
+            _cityController.selectedCity.value = savedCity;
+            city = savedCity;
+          }
+        }
+
+        if (city.isNotEmpty) {
+          _tourController.filterByCity(city);
+        } else {
+          _tourController.fetchTours();
+        }
+      }
+    });
   }
 
   @override
@@ -38,12 +64,21 @@ class _TourListScreenState extends State<TourListScreen> {
   Map<String, List<TourModel>> _groupToursByRegion(List<TourModel> tours) {
     final grouped = <String, List<TourModel>>{};
     for (var tour in tours) {
-      if (!grouped.containsKey(tour.region)) {
-        grouped[tour.region] = [];
+      final region = tour.region.isEmpty ? 'Diğer' : tour.region;
+      if (!grouped.containsKey(region)) {
+        grouped[region] = [];
       }
-      grouped[tour.region]!.add(tour);
+      grouped[region]!.add(tour);
     }
-    return grouped;
+    // Sabit sıralama
+    final sorted = <String, List<TourModel>>{};
+    for (var region in TourController.regionOrder) {
+      if (grouped.containsKey(region)) {
+        sorted[region] = grouped.remove(region)!;
+      }
+    }
+    sorted.addAll(grouped);
+    return sorted;
   }
 
   List<TourModel> _filterTours(List<TourModel> tours) {
@@ -77,44 +112,66 @@ class _TourListScreenState extends State<TourListScreen> {
                     )
                   : CustomScrollView(
                       slivers: [
-                        // Header (sticky)
-                        SliverAppBar(
-                          floating: true,
+                        // Şehir bilgisi + arama (sticky)
+                        SliverPersistentHeader(
                           pinned: true,
-                          snap: true,
-                          elevation: 0,
-                          backgroundColor: AppColors.backgroundDark.withOpacity(0.8),
-                          flexibleSpace: FlexibleSpaceBar(
-                            background: Container(
+                          delegate: _StickyHeaderDelegate(
+                            child: Container(
                               color: AppColors.backgroundDark,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              child: _buildSearchBar(),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildCitySelector(),
+                                  const SizedBox(height: 8),
+                                  _buildSearchBar(),
+                                  const SizedBox(height: 4),
+                                ],
+                              ),
                             ),
                           ),
-                          collapsedHeight: 84,
                         ),
-                        // Tour sections
-                        SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (BuildContext context, int index) {
-                              final filteredTours = _filterTours(_tourController.tours);
-                              final groupedTours = _groupToursByRegion(filteredTours);
-                              final regions = groupedTours.keys.toList();
 
-                              if (index >= regions.length) {
-                                return const SizedBox.shrink();
-                              }
+                        // Boş sonuç
+                        if (_filterTours(_tourController.tours).isEmpty)
+                          SliverFillRemaining(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.travel_explore, color: AppColors.slate500, size: 64),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Bu şehirde henüz tur bulunmuyor',
+                                    style: TextStyle(color: AppColors.slate400, fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          // Bölgelere göre tur listeleri
+                          SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (BuildContext context, int index) {
+                                final filteredTours = _filterTours(_tourController.tours);
+                                final groupedTours = _groupToursByRegion(filteredTours);
+                                final regions = groupedTours.keys.toList();
 
-                              final region = regions[index];
-                              final tours = groupedTours[region]!;
+                                if (index >= regions.length) {
+                                  return const SizedBox.shrink();
+                                }
 
-                              return _buildRegionSection(region, tours);
-                            },
-                            childCount: _tourController.tours.isEmpty
-                                ? 0
-                                : _groupToursByRegion(_filterTours(_tourController.tours)).length,
+                                final region = regions[index];
+                                final tours = groupedTours[region]!;
+
+                                return _buildRegionSection(region, tours);
+                              },
+                              childCount: _tourController.tours.isEmpty
+                                  ? 0
+                                  : _groupToursByRegion(_filterTours(_tourController.tours)).length,
+                            ),
                           ),
-                        ),
                       ],
                     ),
             ),
@@ -125,57 +182,145 @@ class _TourListScreenState extends State<TourListScreen> {
     );
   }
 
-  Widget _buildSearchBar() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
+  Widget _buildCitySelector() {
+    return Obx(() {
+      final city = _cityController.selectedCity.value;
+      return GestureDetector(
+        onTap: _showCityChangeDialog,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.slate800,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.slate700),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.location_on, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                city.isEmpty ? 'Şehir Seçin' : '$city çıkışlı turlar',
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              const Icon(Icons.keyboard_arrow_down, color: AppColors.slate400, size: 22),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  void _showCityChangeDialog() {
+    final searchCtrl = TextEditingController();
+    final filtered = RxList<City>(cityList.where((c) => c.isAvailable).toList());
+
+    Get.dialog(
+      Dialog(
+        backgroundColor: AppColors.backgroundDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          height: 500,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Text(
+                'Şehir Değiştir',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              // Arama
+              Container(
                 decoration: BoxDecoration(
                   color: AppColors.slate800,
-                  border: Border.all(color: AppColors.slate700, width: 1),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8)],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.slate700),
                 ),
                 child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(color: AppColors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Şehir, tur veya aktivite ara...',
-                    hintStyle: const TextStyle(color: AppColors.slate400),
-                    prefixIcon: const Icon(Icons.search, color: AppColors.slate400),
+                  controller: searchCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  onChanged: (q) {
+                    filtered.value = cityList
+                        .where(
+                          (c) => c.isAvailable && c.name.toLowerCase().contains(q.toLowerCase()),
+                        )
+                        .toList();
+                  },
+                  decoration: const InputDecoration(
+                    hintText: 'Şehir ara...',
+                    hintStyle: TextStyle(color: AppColors.slate400),
+                    prefixIcon: Icon(Icons.search, color: AppColors.slate400),
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                    contentPadding: EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8)],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    // TODO: Filter dialog
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: const Icon(Icons.tune, color: AppColors.white),
+              const SizedBox(height: 12),
+              // Şehir listesi
+              Expanded(
+                child: Obx(
+                  () => ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final city = filtered[index];
+                      final isSelected = _cityController.selectedCity.value == city.name;
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                          color: isSelected ? AppColors.primary : AppColors.slate500,
+                          size: 20,
+                        ),
+                        title: Text(
+                          city.name,
+                          style: TextStyle(
+                            color: isSelected ? AppColors.primary : AppColors.slate200,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: Text(
+                          city.region.displayName,
+                          style: const TextStyle(color: AppColors.slate500, fontSize: 11),
+                        ),
+                        onTap: () {
+                          _cityController.updateCity(city.name);
+                          Get.back();
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.slate800,
+        border: Border.all(color: AppColors.slate700, width: 1),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8)],
+      ),
+      child: TextField(
+        controller: _searchController,
+        style: const TextStyle(color: AppColors.white),
+        decoration: const InputDecoration(
+          hintText: 'Tur veya aktivite ara...',
+          hintStyle: TextStyle(color: AppColors.slate400),
+          prefixIcon: Icon(Icons.search, color: AppColors.slate400),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        ),
+      ),
     );
   }
 
@@ -228,4 +373,26 @@ class _TourListScreenState extends State<TourListScreen> {
       },
     );
   }
+}
+
+/// SliverPersistentHeader için delegate.
+/// İçeriğe göre otomatik yükseklik hesaplar, overflow olmaz.
+class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+
+  _StickyHeaderDelegate({required this.child});
+
+  @override
+  double get minExtent => 130;
+
+  @override
+  double get maxExtent => 130;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _StickyHeaderDelegate oldDelegate) => true;
 }

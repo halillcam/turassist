@@ -7,11 +7,26 @@ class TourController extends GetxController {
 
   var tours = <TourModel>[].obs;
   var isLoading = true.obs;
+  var selectedCity = ''.obs;
+
+  // Bölge sıralaması (sabit)
+  static const List<String> regionOrder = [
+    'Marmara',
+    'Ege',
+    'Akdeniz',
+    'Karadeniz',
+    'İç Anadolu',
+    'Doğu Anadolu',
+    'Güneydoğu Anadolu',
+    'Günü Birlik',
+    'Yurtdışı',
+  ];
 
   @override
   void onInit() {
-    fetchTours(); // Başlangıçta tüm aktif turları çek
     super.onInit();
+    // İlk açılışta otomatik fetch yapmıyoruz,
+    // şehir seçildiğinde filterByCity çağrılacak.
   }
 
   // Tüm aktif turları getir (isDeleted: false olanlar)
@@ -29,11 +44,35 @@ class TourController extends GetxController {
   void filterByCity(String city) async {
     try {
       isLoading.value = true;
+      selectedCity.value = city;
       var result = await _firebaseService.getToursByCity(city);
       tours.assignAll(result);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // Turları region'a göre grupla (sıralı)
+  Map<String, List<TourModel>> get toursByRegion {
+    final grouped = <String, List<TourModel>>{};
+    for (var tour in tours) {
+      final region = tour.region.isEmpty ? 'Diğer' : tour.region;
+      if (!grouped.containsKey(region)) {
+        grouped[region] = [];
+      }
+      grouped[region]!.add(tour);
+    }
+
+    // regionOrder sırasına göre sırala
+    final sorted = <String, List<TourModel>>{};
+    for (var region in regionOrder) {
+      if (grouped.containsKey(region)) {
+        sorted[region] = grouped.remove(region)!;
+      }
+    }
+    // Sırada olmayanları sona ekle
+    sorted.addAll(grouped);
+    return sorted;
   }
 
   // Tur detayını getir [cite: 13]
