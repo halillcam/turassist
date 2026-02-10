@@ -38,6 +38,7 @@ class TestTourService {
   }
 
   /// Tüm test turlarını siler (companyId = 'test_company' olanlar).
+  /// Alt koleksiyonları (program) da siler.
   Future<int> deleteTestTours() async {
     try {
       final snapshot = await _firestore
@@ -45,15 +46,36 @@ class TestTourService {
           .where('companyId', isEqualTo: 'test_company')
           .get();
 
-      final batch = _firestore.batch();
       for (final doc in snapshot.docs) {
-        batch.delete(doc.reference);
+        // Önce program alt koleksiyonunu sil
+        final programSnapshot = await doc.reference.collection('program').get();
+        for (final programDoc in programSnapshot.docs) {
+          await programDoc.reference.delete();
+        }
+        // Sonra turu sil
+        await doc.reference.delete();
       }
-      await batch.commit();
 
       return snapshot.docs.length;
     } on FirebaseException catch (e) {
       throw TestTourException(message: 'Silme hatası: ${e.message}', code: e.code);
+    }
+  }
+
+  /// Tura program günleri ekler.
+  /// [tourId] - Programın ekleneceği turun ID'si
+  /// [days] - Her gün için: title, day, order, activities listesi
+  Future<void> addTourProgram(String tourId, List<Map<String, dynamic>> days) async {
+    try {
+      final programRef = _firestore.collection('tours').doc(tourId).collection('program');
+
+      for (final day in days) {
+        await programRef.add(day);
+      }
+    } on FirebaseException catch (e) {
+      throw TestTourException(message: 'Program ekleme hatası: ${e.message}', code: e.code);
+    } catch (e) {
+      throw TestTourException(message: 'Program ekleme hatası: $e');
     }
   }
 }

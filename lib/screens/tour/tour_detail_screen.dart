@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:turassist/config/colors.dart';
 import 'package:turassist/models/tour_model.dart';
+import 'package:turassist/models/tour_program_model.dart';
+import 'package:turassist/services/firebase_service.dart';
 import 'package:turassist/widgets/included_item.dart';
 
 class TourDetailScreen extends StatefulWidget {
@@ -14,6 +16,24 @@ class TourDetailScreen extends StatefulWidget {
 
 class _TourDetailScreenState extends State<TourDetailScreen> {
   bool _isDescriptionExpanded = false;
+  List<TourProgramDay> _programDays = [];
+  bool _isProgramLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTourProgram();
+  }
+
+  Future<void> _loadTourProgram() async {
+    final days = await FirebaseService().getTourProgram(widget.tour.id);
+    if (mounted) {
+      setState(() {
+        _programDays = days;
+        _isProgramLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +60,12 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
                 // Neler dahil
                 _buildIncludedSection(),
+
+                // Tur Programı
+                _buildProgramSection(),
+
+                // Tur Ekstraları
+                if (tour.extraDetail.isNotEmpty) _buildExtrasSection(tour),
               ],
             ),
           ),
@@ -266,6 +292,221 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildExtrasSection(TourModel tour) {
+    final extras = tour.extraDetail
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    return Transform.translate(
+      offset: const Offset(0, -12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Row(
+              children: const [
+                Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Tur Ekstraları',
+                  style: TextStyle(
+                    color: AppColors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.cardDark,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.slate800),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: extras.length > 1
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: extras
+                          .map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 4),
+                                    child: Icon(
+                                      Icons.star_rounded,
+                                      color: AppColors.primary,
+                                      size: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      item,
+                                      style: const TextStyle(
+                                        color: AppColors.slate300,
+                                        fontSize: 14,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    )
+                  : Text(
+                      tour.extraDetail,
+                      style: const TextStyle(color: AppColors.slate300, fontSize: 14, height: 1.6),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgramSection() {
+    return Transform.translate(
+      offset: const Offset(0, -8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            const Text(
+              'Tur Programı',
+              style: TextStyle(color: AppColors.white, fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 16),
+            if (_isProgramLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                  ),
+                ),
+              )
+            else if (_programDays.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'Henüz program eklenmemiş.',
+                  style: TextStyle(color: AppColors.slate500, fontSize: 14),
+                ),
+              )
+            else
+              ..._programDays.map((day) => _buildDayItem(day)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDayItem(TourProgramDay day) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timeline column
+          Column(
+            children: [
+              // Day dot
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.4),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+              // Line
+              if (day != _programDays.last)
+                Container(
+                  width: 2,
+                  height: day.activities.length * 32.0 + 16,
+                  color: AppColors.slate800,
+                ),
+            ],
+          ),
+          const SizedBox(width: 14),
+          // Day content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Day title
+                Transform.translate(
+                  offset: const Offset(0, -3),
+                  child: Text(
+                    day.title.isNotEmpty ? '${day.day}. Gün' : '${day.day}. Gün',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Activities
+                ...day.activities.map(
+                  (activity) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: AppColors.slate500,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            activity.trim(),
+                            style: const TextStyle(
+                              color: AppColors.slate300,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

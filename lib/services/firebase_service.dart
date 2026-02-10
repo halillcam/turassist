@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/tour_model.dart';
+import '../models/tour_program_model.dart';
 import '../models/ticket_model.dart';
 import '../models/user_model.dart';
 import '../models/chat_model.dart';
@@ -63,6 +64,23 @@ class FirebaseService {
     } catch (e) {
       print("Error fetching tour: $e");
       return null;
+    }
+  }
+
+  // Tur programını getir (order alanına göre sıralı)
+  Future<List<TourProgramDay>> getTourProgram(String tourId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('tours')
+          .doc(tourId)
+          .collection('program')
+          .orderBy('order', descending: false)
+          .get();
+
+      return snapshot.docs.map((doc) => TourProgramDay.fromFirestore(doc)).toList();
+    } catch (e) {
+      print("Error fetching tour program: $e");
+      return [];
     }
   }
 

@@ -36,6 +36,7 @@ class TourModel {
   final String id;
   final String title;
   final String description;
+  final String extraDetail;
   final double price;
   final String imageUrl; // Eksik olan görsel alanı eklendi
   final String companyId;
@@ -52,6 +53,7 @@ class TourModel {
     required this.id,
     required this.title,
     required this.description,
+    required this.extraDetail,
     required this.price,
     required this.imageUrl,
     required this.companyId,
@@ -71,6 +73,7 @@ class TourModel {
       id: doc.id,
       title: data['title'] ?? '',
       description: data['description'] ?? '',
+      extraDetail: data['extraDetail'] ?? '',
       price: (data['price'] ?? 0).toDouble(),
       imageUrl: data['imageUrl'] ?? '', //
       companyId: data['companyId'] ?? '',
@@ -89,6 +92,7 @@ class TourModel {
     return {
       'title': title,
       'description': description,
+      'extraDetail': extraDetail,
       'price': price,
       'imageUrl': imageUrl, //
       'companyId': companyId,

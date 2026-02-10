@@ -37,6 +37,10 @@ class _TestTourScreenState extends State<TestTourScreen> {
   String _selectedRegion = 'Marmara';
   final List<String> _logMessages = [];
 
+  // Tur Programı - Dinamik günler ve aktiviteler
+  // Her eleman: { 'title': TextEditingController, 'activities': [TextEditingController, ...] }
+  final List<Map<String, dynamic>> _programDays = [];
+
   final List<String> _regions = [
     'Akdeniz',
     'Karadeniz',
@@ -62,7 +66,71 @@ class _TestTourScreenState extends State<TestTourScreen> {
     _driverPhoneController.dispose();
     _plateController.dispose();
     _busCapacityController.dispose();
+    // Program controller'larını dispose et
+    for (final day in _programDays) {
+      (day['title'] as TextEditingController).dispose();
+      for (final ctrl in day['activities'] as List<TextEditingController>) {
+        ctrl.dispose();
+      }
+    }
     super.dispose();
+  }
+
+  void _addProgramDay() {
+    setState(() {
+      _programDays.add({
+        'title': TextEditingController(text: '${_programDays.length + 1}. gün'),
+        'activities': <TextEditingController>[TextEditingController()],
+      });
+    });
+  }
+
+  void _removeProgramDay(int index) {
+    setState(() {
+      final day = _programDays.removeAt(index);
+      (day['title'] as TextEditingController).dispose();
+      for (final ctrl in day['activities'] as List<TextEditingController>) {
+        ctrl.dispose();
+      }
+    });
+  }
+
+  void _addActivity(int dayIndex) {
+    setState(() {
+      (_programDays[dayIndex]['activities'] as List<TextEditingController>).add(
+        TextEditingController(),
+      );
+    });
+  }
+
+  void _removeActivity(int dayIndex, int activityIndex) {
+    setState(() {
+      final activities = _programDays[dayIndex]['activities'] as List<TextEditingController>;
+      if (activities.length > 1) {
+        activities.removeAt(activityIndex).dispose();
+      }
+    });
+  }
+
+  List<Map<String, dynamic>> _buildProgramData() {
+    final result = <Map<String, dynamic>>[];
+    for (int i = 0; i < _programDays.length; i++) {
+      final day = _programDays[i];
+      final title = (day['title'] as TextEditingController).text.trim();
+      final activities = (day['activities'] as List<TextEditingController>)
+          .map((c) => c.text.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+      if (activities.isNotEmpty) {
+        result.add({
+          'title': title.isEmpty ? '${i + 1}. gün' : title,
+          'day': i + 1,
+          'order': i + 1,
+          'activities': activities,
+        });
+      }
+    }
+    return result;
   }
 
   void _addLog(String message, {bool isError = false}) {
@@ -100,10 +168,18 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       );
 
       final docId = await _service.addTour(tour);
       _addLog('Tur eklendi: "${tour.title}" (ID: $docId)');
+
+      // Tur programını ekle
+      final programData = _buildProgramData();
+      if (programData.isNotEmpty) {
+        await _service.addTourProgram(docId, programData);
+        _addLog('Program eklendi: ${programData.length} gün (Tur: $docId)');
+      }
 
       Get.snackbar(
         'Başarılı',
@@ -165,6 +241,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
       TourModel(
         id: '',
@@ -187,6 +264,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
       TourModel(
         id: '',
@@ -209,6 +287,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
       TourModel(
         id: '',
@@ -231,6 +310,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
       TourModel(
         id: '',
@@ -252,6 +332,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
       TourModel(
         id: '',
@@ -274,6 +355,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
       TourModel(
         id: '',
@@ -295,6 +377,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
       TourModel(
         id: '',
@@ -316,6 +399,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
       TourModel(
         id: '',
@@ -337,6 +421,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
       TourModel(
         id: '',
@@ -358,6 +443,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         createdAt: DateTime.now(),
         isDeleted: false,
+        extraDetail: '',
       ),
     ];
 
@@ -445,6 +531,14 @@ class _TestTourScreenState extends State<TestTourScreen> {
     _driverPhoneController.clear();
     _plateController.clear();
     _busCapacityController.clear();
+    // Program controller'larını temizle
+    for (final day in _programDays) {
+      (day['title'] as TextEditingController).dispose();
+      for (final ctrl in day['activities'] as List<TextEditingController>) {
+        ctrl.dispose();
+      }
+    }
+    _programDays.clear();
     setState(() => _selectedRegion = 'Marmara');
   }
 
@@ -585,6 +679,11 @@ class _TestTourScreenState extends State<TestTourScreen> {
                           label: 'Rehber Adı (Opsiyonel)',
                           icon: Icons.person,
                         ),
+
+                        const SizedBox(height: 20),
+                        _buildSectionTitle('Tur Programı'),
+                        const SizedBox(height: 8),
+                        _buildProgramSection(),
 
                         const SizedBox(height: 20),
                         _buildSectionTitle('Araç Bilgileri'),
@@ -746,6 +845,168 @@ class _TestTourScreenState extends State<TestTourScreen> {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
+    );
+  }
+
+  Widget _buildProgramSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Mevcut günler
+        ..._programDays.asMap().entries.map((entry) {
+          final dayIndex = entry.key;
+          final day = entry.value;
+          final titleCtrl = day['title'] as TextEditingController;
+          final activities = day['activities'] as List<TextEditingController>;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.slate900,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.slate700),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Gün başlığı satırı
+                Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextFormField(
+                        controller: titleCtrl,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '${dayIndex + 1}. Gün başlığı',
+                          hintStyle: TextStyle(color: AppColors.slate500, fontSize: 14),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    // Günü sil
+                    IconButton(
+                      onPressed: () => _removeProgramDay(dayIndex),
+                      icon: const Icon(Icons.close, color: AppColors.error, size: 18),
+                      constraints: const BoxConstraints(),
+                      padding: EdgeInsets.zero,
+                      tooltip: 'Günü sil',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Aktiviteler
+                ...activities.asMap().entries.map((actEntry) {
+                  final actIndex = actEntry.key;
+                  final actCtrl = actEntry.value;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 18, bottom: 6),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: AppColors.slate500,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: actCtrl,
+                            style: const TextStyle(color: AppColors.slate300, fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: 'Aktivite ${actIndex + 1}',
+                              hintStyle: TextStyle(color: AppColors.slate600, fontSize: 13),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              filled: true,
+                              fillColor: AppColors.slate800,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Aktivite sil
+                        if (activities.length > 1)
+                          GestureDetector(
+                            onTap: () => _removeActivity(dayIndex, actIndex),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.remove_circle_outline,
+                                color: AppColors.error,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+
+                // Aktivite ekle butonu
+                Padding(
+                  padding: const EdgeInsets.only(left: 18, top: 4),
+                  child: GestureDetector(
+                    onTap: () => _addActivity(dayIndex),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.add_circle_outline, color: AppColors.primary, size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          'Aktivite Ekle',
+                          style: TextStyle(color: AppColors.primary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+
+        // Gün ekle butonu
+        OutlinedButton.icon(
+          onPressed: _addProgramDay,
+          icon: const Icon(Icons.add, color: AppColors.primary, size: 18),
+          label: Text(
+            _programDays.isEmpty ? 'Program Günü Ekle' : 'Yeni Gün Ekle',
+            style: const TextStyle(color: AppColors.primary, fontSize: 13),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: AppColors.primary.withOpacity(0.4)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+        ),
+      ],
     );
   }
 
