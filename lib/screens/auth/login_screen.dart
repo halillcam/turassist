@@ -104,6 +104,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
+                    // TEST BUTTON - Tur Sorumlusu Paneli - TO BE REMOVED
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Get.toNamed('/tour-manager-home'),
+                        icon: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 18),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal.withOpacity(0.8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        label: const Text(
+                          'TEST: Tur Sorumlusu Paneli',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+
                     const SizedBox(height: 16),
                   ],
                 ),

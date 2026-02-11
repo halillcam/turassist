@@ -40,8 +40,8 @@ class BottomNavBar extends StatelessWidget {
                 onTap: () => onItemTapped(1),
               ),
               NavItem(
-                icon: Icons.favorite_outline,
-                label: 'Favoriler',
+                icon: Icons.qr_code_2,
+                label: "QR'larım",
                 isActive: activeIndex == 2,
                 badge: badges?[2],
                 onTap: () => onItemTapped(2),

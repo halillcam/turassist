@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:turassist/config/colors.dart';
+import 'package:turassist/config/app_routes.dart';
 import 'package:turassist/controllers/tour_controller.dart';
 import 'package:turassist/controllers/city_controller.dart';
 import 'package:turassist/models/tour_model.dart';
@@ -367,9 +368,20 @@ class _TourListScreenState extends State<TourListScreen> {
   Widget _buildBottomNavBar() {
     return BottomNavBar(
       activeIndex: 0,
-      badges: {1: '2'},
       onItemTapped: (index) {
-        // TODO: Handle navigation
+        switch (index) {
+          case 0:
+            break;
+          case 1:
+            Get.offNamed(AppRoutes.myTours);
+            break;
+          case 2:
+            Get.offNamed(AppRoutes.myQrs);
+            break;
+          case 3:
+            Get.offNamed(AppRoutes.profile);
+            break;
+        }
       },
     );
   }
