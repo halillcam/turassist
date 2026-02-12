@@ -146,6 +146,21 @@ class FirebaseService {
     }
   }
 
+  // Kullanıcı profilini getir
+  Future<UserModel?> getUserProfile() async {
+    try {
+      final userId = _auth.currentUser?.uid ?? '';
+      if (userId.isEmpty) return null;
+
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (!doc.exists) return null;
+      return UserModel.fromFirestore(doc);
+    } catch (e) {
+      print("getUserProfile Error: $e");
+      return null;
+    }
+  }
+
   // Kullanıcının biletlerini getir [cite: 15]
   Future<List<TicketModel>> getUserTickets() async {
     try {

@@ -376,9 +376,6 @@ class _TourListScreenState extends State<TourListScreen> {
             Get.offNamed(AppRoutes.myTours);
             break;
           case 2:
-            Get.offNamed(AppRoutes.myQrs);
-            break;
-          case 3:
             Get.offNamed(AppRoutes.profile);
             break;
         }
