@@ -227,71 +227,96 @@ class _CityChoiceScreenState extends State<CityChoiceScreen> with TickerProvider
                       ),
                     ],
                   ),
-                  child: Stack(
-                    children: [
-                      // City image - Local asset or network fallback
-                      if (city.isAvailable)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: city.imageAsset != null
-                              ? Image.asset(
-                                  city.imagePath,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return _buildImageWithFallback(city, isDark);
-                                  },
-                                )
-                              : Image.network(
-                                  city.networkImageUrl ?? '',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return _buildPlaceholder(isDark);
-                                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(13),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Network image
+                        if (city.isAvailable && city.networkImageUrl != null)
+                          Image.network(
+                            city.networkImageUrl!,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: AppColors.cardDark,
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary.withOpacity(0.5),
+                                    ),
+                                  ),
                                 ),
-                        )
-                      else
-                        _buildPlaceholder(isDark),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildPlaceholder();
+                            },
+                          )
+                        else
+                          _buildPlaceholder(),
 
-                      // Overlay
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            color: Colors.black.withOpacity(
-                              city.isAvailable ? (isSelected ? 0.2 : 0.1) : 0.4,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Selected indicator
-                      if (isSelected)
+                        // Dark gradient overlay for text readability
                         Positioned.fill(
-                          child: Center(
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.primary.withOpacity(0.9),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(city.isAvailable ? 0.4 : 0.6),
+                                ],
                               ),
-                              child: const Icon(Icons.check, color: AppColors.white, size: 24),
                             ),
                           ),
                         ),
 
-                      // Unavailable badge
-                      if (!city.isAvailable)
-                        Positioned.fill(
-                          child: Center(
-                            child: Icon(
-                              Icons.lock_outline,
-                              color: Colors.white.withOpacity(0.6),
-                              size: 32,
+                        // Selected overlay
+                        if (isSelected)
+                          Positioned.fill(
+                            child: Container(
+                              color: AppColors.primary.withOpacity(0.25),
+                              child: Center(
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppColors.primary,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withOpacity(0.4),
+                                        blurRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(Icons.check, color: Colors.white, size: 20),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+
+                        // Unavailable overlay
+                        if (!city.isAvailable)
+                          Positioned.fill(
+                            child: Container(
+                              color: Colors.black.withOpacity(0.5),
+                              child: Center(
+                                child: Icon(
+                                  Icons.lock_outline,
+                                  color: Colors.white.withOpacity(0.6),
+                                  size: 28,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -314,28 +339,11 @@ class _CityChoiceScreenState extends State<CityChoiceScreen> with TickerProvider
     });
   }
 
-  Widget _buildImageWithFallback(City city, bool isDark) {
-    // Try network image if local asset fails
-    if (city.networkImageUrl != null) {
-      return Image.network(
-        city.networkImageUrl!,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return _buildPlaceholder(isDark);
-        },
-      );
-    }
-    return _buildPlaceholder(isDark);
-  }
-
-  Widget _buildPlaceholder(bool isDark) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        color: AppColors.slate700,
-        child: const Center(
-          child: Icon(Icons.image_not_supported_outlined, color: AppColors.slate900, size: 28),
-        ),
+  Widget _buildPlaceholder() {
+    return Container(
+      color: AppColors.cardDark,
+      child: const Center(
+        child: Icon(Icons.location_city_rounded, color: AppColors.slate600, size: 28),
       ),
     );
   }

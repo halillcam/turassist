@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:turassist/config/app_routes.dart';
 import 'package:turassist/config/colors.dart';
 import 'package:turassist/models/user_model.dart';
+import 'package:turassist/screens/profile/edit_profile_screen.dart';
+import 'package:turassist/screens/profile/change_password_screen.dart';
 import 'package:turassist/services/firebase_service.dart';
 import 'package:turassist/widgets/index.dart';
 
@@ -10,6 +12,7 @@ class ProfileController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
   final Rx<UserModel?> user = Rx<UserModel?>(null);
   final RxBool isLoading = true.obs;
+  final RxBool notificationsEnabled = true.obs;
 
   @override
   void onInit() {
@@ -99,7 +102,7 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 32),
 
               // Menu Items
-              _buildMenuCard(),
+              _buildMenuCard(controller),
               const SizedBox(height: 24),
 
               // Logout Button
@@ -168,7 +171,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuCard() {
+  Widget _buildMenuCard(ProfileController controller) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardDark,
@@ -180,13 +183,16 @@ class ProfileScreen extends StatelessWidget {
           _buildMenuItem(
             icon: Icons.person_outline_rounded,
             title: 'Profili Düzenle',
-            onTap: () {
-              Get.snackbar(
-                'Bilgi',
-                'Profil düzenleme yakında eklenecek',
-                backgroundColor: AppColors.primary.withOpacity(0.8),
-                colorText: Colors.white,
+            onTap: () async {
+              final user = controller.user.value;
+              final result = await Get.to(
+                () => const EditProfileScreen(),
+                arguments: {'fullName': user?.fullName ?? '', 'email': user?.email ?? ''},
+                transition: Transition.rightToLeft,
               );
+              if (result == true) {
+                controller.loadUserProfile();
+              }
             },
           ),
           _buildDivider(),
@@ -194,30 +200,83 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.lock_outline_rounded,
             title: 'Şifre Değiştir',
             onTap: () {
-              Get.snackbar(
-                'Bilgi',
-                'Şifre değiştirme yakında eklenecek',
-                backgroundColor: AppColors.primary.withOpacity(0.8),
-                colorText: Colors.white,
-              );
+              Get.to(() => const ChangePasswordScreen(), transition: Transition.rightToLeft);
             },
           ),
           _buildDivider(),
-          _buildMenuItem(
-            icon: Icons.notifications_none_rounded,
-            title: 'Bildirim Ayarları',
-            onTap: () {
-              Get.snackbar(
-                'Bilgi',
-                'Bildirim ayarları yakında eklenecek',
-                backgroundColor: AppColors.primary.withOpacity(0.8),
-                colorText: Colors.white,
-              );
-            },
-          ),
+          _buildNotificationItem(controller),
         ],
       ),
     );
+  }
+
+  Widget _buildNotificationItem(ProfileController controller) {
+    return Obx(() {
+      final enabled = controller.notificationsEnabled.value;
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            controller.notificationsEnabled.value = !enabled;
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: (enabled ? AppColors.primary : AppColors.slate600).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    enabled ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+                    color: enabled ? AppColors.primary : AppColors.slate500,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Bildirimler',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        enabled ? 'Bildirimler açık' : 'Bildirimler kapalı',
+                        style: TextStyle(
+                          color: enabled ? AppColors.primary : AppColors.slate500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: enabled,
+                  onChanged: (val) {
+                    controller.notificationsEnabled.value = val;
+                  },
+                  activeColor: AppColors.primary,
+                  activeTrackColor: AppColors.primary.withOpacity(0.3),
+                  inactiveThumbColor: AppColors.slate500,
+                  inactiveTrackColor: AppColors.slate700,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
   }
 
   Widget _buildMenuItem({

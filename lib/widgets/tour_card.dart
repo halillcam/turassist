@@ -13,8 +13,7 @@ class TourCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 280,
-        height: 300,
+        width: 240,
         decoration: BoxDecoration(
           color: AppColors.slate800.withOpacity(0.5),
           borderRadius: BorderRadius.circular(16),
@@ -31,10 +30,11 @@ class TourCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               // Tour image
               Container(
-                height: 120,
+                height: 130,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.only(
@@ -59,63 +59,61 @@ class TourCard extends StatelessWidget {
                     : null,
               ),
               // Tour info
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Title
-                      Text(
-                        tour.title,
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Title
+                    Text(
+                      tour.title,
+                      style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 4),
-                      // Price
-                      Text(
-                        '₺${tour.price.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    // Price
+                    Text(
+                      '₺${tour.price.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 6),
-                      // Description
-                      Text(
-                        tour.description,
-                        style: const TextStyle(color: AppColors.slate400, fontSize: 11),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      // Capacity
-                      Row(
-                        children: [
-                          const Icon(Icons.group, color: AppColors.slate400, size: 14),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              'Maks ${tour.capacity} Kişi',
-                              style: const TextStyle(
-                                color: AppColors.slate400,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    // Description
+                    Text(
+                      tour.description,
+                      style: const TextStyle(color: AppColors.slate400, fontSize: 11),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    // Capacity
+                    Row(
+                      children: [
+                        const Icon(Icons.group, color: AppColors.slate400, size: 14),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Max ${tour.capacity} Kişi',
+                            style: const TextStyle(
+                              color: AppColors.slate400,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],

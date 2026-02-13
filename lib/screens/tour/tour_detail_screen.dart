@@ -59,7 +59,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 _buildAboutSection(tour),
 
                 // Neler dahil
-                _buildIncludedSection(),
+                // _buildIncludedSection(),
 
                 // Tur Programı
                 _buildProgramSection(),
