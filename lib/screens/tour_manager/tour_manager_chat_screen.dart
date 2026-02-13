@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:turassist/config/colors.dart';
+
+import '../../config/colors.dart';
 
 class TourManagerChatScreen extends StatefulWidget {
   const TourManagerChatScreen({super.key});
@@ -56,7 +57,7 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
         children: [
           // Geri butonu
           GestureDetector(
-            onTap: () => Get.back(),
+            onTap: Get.back,
             child: Padding(
               padding: const EdgeInsets.all(4),
               child: const Icon(Icons.arrow_back_ios_new, color: AppColors.primary, size: 22),

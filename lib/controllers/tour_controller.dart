@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import '../services/firebase_service.dart';
+
 import '../models/tour_model.dart';
+import '../services/firebase_service.dart';
 
 class TourController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
@@ -22,12 +24,8 @@ class TourController extends GetxController {
     'Yurtdışı',
   ];
 
-  @override
-  void onInit() {
-    super.onInit();
-    // İlk açılışta otomatik fetch yapmıyoruz,
-    // şehir seçildiğinde filterByCity çağrılacak.
-  }
+  // İlk açılışta otomatik fetch yapmıyoruz,
+  // şehir seçildiğinde filterByCity çağrılacak.
 
   // Tüm aktif turları getir (isDeleted: false olanlar)
   void fetchTours() async {
@@ -92,7 +90,7 @@ class TourController extends GetxController {
       var result = await _firebaseService.getTourParticipants(tourId);
       return result;
     } catch (e) {
-      print('Katılımcıları yüklerken hata: $e');
+      debugPrint('Katılımcıları yüklerken hata: $e');
       return [];
     }
   }
@@ -103,7 +101,7 @@ class TourController extends GetxController {
       isLoading.value = true;
       await _firebaseService.finishTour(tourId, guideId);
     } catch (e) {
-      print('Turu bitirirken hata: $e');
+      debugPrint('Turu bitirirken hata: $e');
     } finally {
       isLoading.value = false;
     }
@@ -120,7 +118,7 @@ class TourController extends GetxController {
         tours[index] = updatedTour;
       }
     } catch (e) {
-      print('Turu güncellerken hata: $e');
+      debugPrint('Turu güncellerken hata: $e');
     } finally {
       isLoading.value = false;
     }

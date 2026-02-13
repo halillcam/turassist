@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class SocialButtonsRow extends StatelessWidget {
   final VoidCallback onGoogleTap;
 
-  const SocialButtonsRow({Key? key, required this.onGoogleTap}) : super(key: key);
+  const SocialButtonsRow({super.key, required this.onGoogleTap});
 
   @override
   Widget build(BuildContext context) {

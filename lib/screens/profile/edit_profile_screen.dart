@@ -1,109 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:turassist/config/colors.dart';
 
-class EditProfileController extends GetxController {
-  final fullNameController = TextEditingController();
-  final emailController = TextEditingController();
-  final RxBool isLoading = false.obs;
-
-  @override
-  void onInit() {
-    super.onInit();
-    final args = Get.arguments as Map<String, String>?;
-    if (args != null) {
-      fullNameController.text = args['fullName'] ?? '';
-      emailController.text = args['email'] ?? '';
-    }
-  }
-
-  @override
-  void onClose() {
-    fullNameController.dispose();
-    emailController.dispose();
-    super.onClose();
-  }
-
-  Future<void> updateProfile() async {
-    final name = fullNameController.text.trim();
-    final email = emailController.text.trim();
-
-    if (name.isEmpty || email.isEmpty) {
-      Get.snackbar(
-        'Hata',
-        'Ad Soyad ve E-posta alanları boş bırakılamaz',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-      return;
-    }
-
-    if (!GetUtils.isEmail(email)) {
-      Get.snackbar(
-        'Hata',
-        'Geçerli bir e-posta adresi giriniz',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-      return;
-    }
-
-    isLoading.value = true;
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('Kullanıcı bulunamadı');
-
-      // Update email in Firebase Auth if changed
-      if (email != user.email) {
-        await user.verifyBeforeUpdateEmail(email);
-      }
-
-      // Update Firestore
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'fullName': name,
-        'email': email,
-      });
-
-      Get.snackbar(
-        'Başarılı',
-        'Profil bilgileriniz güncellendi',
-        backgroundColor: AppColors.primary.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-
-      Get.back(result: true);
-    } on FirebaseAuthException catch (e) {
-      String message = 'Bir hata oluştu';
-      if (e.code == 'requires-recent-login') {
-        message = 'E-posta değişikliği için yeniden giriş yapmanız gerekiyor';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'Bu e-posta adresi zaten kullanılıyor';
-      }
-      Get.snackbar(
-        'Hata',
-        message,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-    } catch (e) {
-      Get.snackbar(
-        'Hata',
-        'Profil güncellenirken bir hata oluştu',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-    } finally {
-      isLoading.value = false;
-    }
-  }
-}
+import '../../config/colors.dart';
+import '../../controllers/edit_profile_controller.dart';
 
 class EditProfileScreen extends StatelessWidget {
   const EditProfileScreen({super.key});
@@ -124,7 +23,7 @@ class EditProfileScreen extends StatelessWidget {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Get.back(),
+          onPressed: Get.back,
         ),
       ),
       body: SingleChildScrollView(
@@ -142,7 +41,7 @@ class EditProfileScreen extends StatelessWidget {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.primary, Color(0xFF0d5bab)],
+                    colors: [AppColors.primary, AppColors.primaryDark],
                   ),
                   boxShadow: [
                     BoxShadow(

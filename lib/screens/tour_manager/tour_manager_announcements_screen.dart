@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:turassist/config/colors.dart';
+
+import '../../config/colors.dart';
 
 class TourManagerAnnouncementsScreen extends StatefulWidget {
   const TourManagerAnnouncementsScreen({super.key});
@@ -33,13 +34,17 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
   // Hazır mesaj şablonları
   final List<Map<String, String>> _quickMessages = [
     {
-      'emoji': '🚌',
+      'emoji': 'ğŸšŒ',
       'label': 'Otobüs Kalkış',
       'text': 'Otobüs 5 dakika içinde kalkıyor. Lütfen yerinize geçin.',
     },
-    {'emoji': '📍', 'label': 'Girişte Buluşma', 'text': 'Lütfen giriş noktasında toplanın.'},
     {
-      'emoji': '🍽️',
+      'emoji': 'ğŸ“',
+      'label': 'Girişte Buluşma',
+      'text': 'Lütfen giriş noktasında toplanın.',
+    },
+    {
+      'emoji': 'ğŸ½ï¸',
       'label': 'Yemek Molası',
       'text': 'Yemek molası başlamıştır. Toplanma yerimiz restoran girişidir.',
     },
@@ -107,7 +112,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
         children: [
           // Geri butonu
           GestureDetector(
-            onTap: () => Get.back(),
+            onTap: Get.back,
             child: Container(
               width: 40,
               height: 40,
@@ -190,7 +195,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF10b981),
+                        color: AppColors.success,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -198,7 +203,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
                     const Text(
                       'CANLI YAYIN',
                       style: TextStyle(
-                        color: Color(0xFF10b981),
+                        color: AppColors.success,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
@@ -219,7 +224,8 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
                   onChanged: (_) => setState(() {}),
                   style: const TextStyle(color: AppColors.white, fontSize: 16, height: 1.5),
                   decoration: InputDecoration(
-                    hintText: 'Mesajınızı buraya yazın... (Örn: Otobüs 5 dakika içinde kalkıyor)',
+                    hintText:
+                        'Mesajınızı buraya yazın... (Örn: Otobüs 5 dakika içinde kalkıyor)',
                     hintStyle: TextStyle(color: AppColors.slate500, fontSize: 15),
                     filled: true,
                     fillColor: AppColors.slate800.withOpacity(0.5),
@@ -294,7 +300,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: _quickMessages.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final msg = _quickMessages[index];
           return GestureDetector(

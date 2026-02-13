@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:turassist/config/colors.dart';
-import 'package:turassist/models/tour_model.dart';
+import '../config/colors.dart';
+import '../models/tour_model.dart';
 
 class TourCard extends StatelessWidget {
   final TourModel tour;
   final VoidCallback? onTap;
 
-  const TourCard({Key? key, required this.tour, this.onTap}) : super(key: key);
+  const TourCard({super.key, required this.tour, this.onTap});
 
   @override
   Widget build(BuildContext context) {

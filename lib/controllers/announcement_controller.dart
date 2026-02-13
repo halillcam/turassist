@@ -1,7 +1,9 @@
-import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-import '../services/firebase_service.dart';
+import 'package:get/get.dart';
+
+import '../config/colors.dart';
 import '../models/announcement_model.dart';
+import '../services/firebase_service.dart';
 
 class AnnouncementController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
@@ -24,14 +26,14 @@ class AnnouncementController extends GetxController {
       Get.snackbar(
         "Başarılı",
         "Duyuru gönderildi.",
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.success,
         colorText: Colors.white,
       );
     } catch (e) {
       Get.snackbar(
         "Hata",
         "Duyuru gönderme başarısız: $e",
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {
@@ -46,7 +48,7 @@ class AnnouncementController extends GetxController {
       var result = await _firebaseService.getAllAnnouncements(tourId);
       announcements.assignAll(result);
     } catch (e) {
-      print('Duyuruları yüklerken hata: $e');
+      debugPrint('Duyuruları yüklerken hata: $e');
     } finally {
       isLoading.value = false;
     }
@@ -61,14 +63,14 @@ class AnnouncementController extends GetxController {
       Get.snackbar(
         "Başarılı",
         "Duyuru silindi.",
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.success,
         colorText: Colors.white,
       );
     } catch (e) {
       Get.snackbar(
         "Hata",
         "Duyuru silme başarısız: $e",
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {

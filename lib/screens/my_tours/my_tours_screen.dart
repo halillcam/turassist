@@ -1,166 +1,16 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:turassist/config/app_routes.dart';
-import 'package:turassist/config/colors.dart';
-import 'package:turassist/models/ticket_model.dart';
-import 'package:turassist/models/tour_model.dart';
-import 'package:turassist/models/tour_program_model.dart';
-import 'package:turassist/services/firebase_service.dart';
-import 'package:turassist/widgets/index.dart';
 
-// ── Controller ──────────────────────────────────────────────
-class MyToursController extends GetxController {
-  final FirebaseService _firebaseService = FirebaseService();
+import '../../config/app_routes.dart';
+import '../../config/colors.dart';
+import '../../controllers/my_tours_controller.dart';
+import '../../models/ticket_model.dart';
+import '../../models/tour_model.dart';
+import '../../models/tour_program_model.dart';
+import '../../widgets/index.dart';
 
-  // Genel durum
-  var isLoading = true.obs;
-  var errorMessage = ''.obs;
-
-  // Bilet listesi (QR taranmamış)
-  var tickets = <TicketModel>[].obs;
-  var ticketTours = <String, TourModel>{}.obs; // tourId -> TourModel cache
-  var selectedTab = 0.obs; // 0: Yaklaşan, 1: Geçmiş
-
-  // Aktif tur detayı (QR taranmış - checked_in)
-  var checkedInTicket = Rxn<TicketModel>();
-  var activeTour = Rxn<TourModel>();
-  var programDays = <TourProgramDay>[].obs;
-
-  // Test modu
-  var isTestCheckedIn = false.obs;
-
-  @override
-  void onInit() {
-    super.onInit();
-    loadData();
-  }
-
-  Future<void> loadData() async {
-    try {
-      isLoading.value = true;
-      errorMessage.value = '';
-
-      // Kullanıcının biletlerini çek
-      final userTickets = await _firebaseService.getUserTickets();
-      tickets.assignAll(userTickets);
-
-      // checked_in olan bilet var mı kontrol et
-      final checkedIn =
-          userTickets.where((t) => t.status == 'checked_in').toList();
-      if (checkedIn.isNotEmpty) {
-        checkedInTicket.value = checkedIn.first;
-        await _loadActiveTourDetail(checkedIn.first.tourId);
-      }
-
-      // Tüm biletlerin tur bilgilerini çek (cache)
-      for (final ticket in userTickets) {
-        if (!ticketTours.containsKey(ticket.tourId)) {
-          final tour = await _firebaseService.getTourById(ticket.tourId);
-          if (tour != null) {
-            ticketTours[ticket.tourId] = tour;
-          }
-        }
-      }
-    } catch (e) {
-      errorMessage.value = 'Veriler yüklenirken hata oluştu.';
-      debugPrint('MyToursController error: $e');
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  Future<void> _loadActiveTourDetail(String tourId) async {
-    final tour = await _firebaseService.getTourById(tourId);
-    if (tour != null) {
-      activeTour.value = tour;
-      final program = await _firebaseService.getTourProgram(tourId);
-      programDays.assignAll(program);
-    }
-  }
-
-  // Aktif (checked_in) bir bilet var mı?
-  bool get hasCheckedIn =>
-      checkedInTicket.value != null || isTestCheckedIn.value;
-
-  // Yaklaşan turlar: active durumundaki biletler
-  List<TicketModel> get upcomingTickets =>
-      tickets.where((t) => t.status == 'active').toList();
-
-  // Geçmiş turlar: completed veya cancelled durumundaki biletler
-  List<TicketModel> get pastTickets =>
-      tickets
-          .where((t) => t.status == 'completed' || t.status == 'cancelled')
-          .toList();
-
-  // 🧪 Test: QR taranmış gibi simüle et
-  Future<void> simulateCheckIn() async {
-    // Bilet yoksa, DB'den herhangi bir aktif turu al
-    isTestCheckedIn.value = true;
-
-    if (tickets.isNotEmpty) {
-      final testTicket =
-          upcomingTickets.isNotEmpty ? upcomingTickets.first : tickets.first;
-      checkedInTicket.value = testTicket;
-      await _loadActiveTourDetail(testTicket.tourId);
-    } else {
-      // Bilet yok, doğrudan aktif turlardan birini yükle
-      final tours = await _firebaseService.getActiveTours();
-      if (tours.isNotEmpty) {
-        // Program olan ilk turu bul
-        for (final t in tours) {
-          final program = await _firebaseService.getTourProgram(t.id);
-          if (program.isNotEmpty) {
-            activeTour.value = t;
-            programDays.assignAll(program);
-            break;
-          }
-        }
-        // Programı olan bulunamadıysa ilk turu göster
-        if (activeTour.value == null) {
-          activeTour.value = tours.first;
-        }
-      }
-    }
-
-    Get.snackbar(
-      '🧪 Test Modu',
-      'QR taranmış gibi simüle edildi.',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppColors.primary,
-      colorText: Colors.white,
-    );
-  }
-
-  // 🧪 Test: Simülasyonu geri al
-  void resetCheckIn() {
-    isTestCheckedIn.value = false;
-    checkedInTicket.value = null;
-    activeTour.value = null;
-    programDays.clear();
-
-    // Gerçek checked_in bilet varsa geri yükle
-    final realCheckedIn =
-        tickets.where((t) => t.status == 'checked_in').toList();
-    if (realCheckedIn.isNotEmpty) {
-      checkedInTicket.value = realCheckedIn.first;
-      _loadActiveTourDetail(realCheckedIn.first.tourId);
-    }
-
-    Get.snackbar(
-      '🧪 Test Modu',
-      'Bilet listesine geri dönüldü.',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppColors.slate700,
-      colorText: Colors.white,
-    );
-  }
-
-  Future<void> refresh() => loadData();
-}
-
-// ── Screen ──────────────────────────────────────────────────
+/// Turlarım ekranı - kullanıcının biletlerini ve aktif turlarını gösterir.
 class MyToursScreen extends StatelessWidget {
   const MyToursScreen({super.key});
 
@@ -187,9 +37,7 @@ class MyToursScreen extends StatelessWidget {
         bottom: false,
         child: Obx(() {
           if (controller.isLoading.value) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            );
+            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
 
           // checked_in durumu → Aktif Tur Detayları ekranı
@@ -201,9 +49,8 @@ class MyToursScreen extends StatelessWidget {
           return _TicketListView(controller: controller);
         }),
       ),
-      bottomNavigationBar:
-          BottomNavBar(activeIndex: 1, onItemTapped: _onItemTapped),
-      // 🧪 Test butonu
+      bottomNavigationBar: BottomNavBar(activeIndex: 1, onItemTapped: _onItemTapped),
+      // ğŸ§ª Test butonu
       floatingActionButton: Obx(() {
         return FloatingActionButton.extended(
           onPressed: () {
@@ -213,8 +60,7 @@ class MyToursScreen extends StatelessWidget {
               controller.simulateCheckIn();
             }
           },
-          backgroundColor:
-              controller.hasCheckedIn ? AppColors.slate700 : AppColors.primary,
+          backgroundColor: controller.hasCheckedIn ? AppColors.slate700 : AppColors.primary,
           icon: Icon(
             controller.hasCheckedIn ? Icons.undo : Icons.qr_code_scanner,
             color: Colors.white,
@@ -222,11 +68,7 @@ class MyToursScreen extends StatelessWidget {
           ),
           label: Text(
             controller.hasCheckedIn ? 'Listeye Dön' : 'QR Tara (Test)',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
           ),
         );
       }),
@@ -270,10 +112,7 @@ class _TicketListView extends StatelessWidget {
                       controller.selectedTab.value == 0
                           ? 'Yaklaşan turunuz bulunmuyor.'
                           : 'Geçmiş turunuz bulunmuyor.',
-                      style: const TextStyle(
-                        color: AppColors.slate400,
-                        fontSize: 14,
-                      ),
+                      style: const TextStyle(color: AppColors.slate400, fontSize: 14),
                     ),
                   ],
                 ),
@@ -281,15 +120,13 @@ class _TicketListView extends StatelessWidget {
             }
 
             return RefreshIndicator(
-              onRefresh: () => controller.refresh(),
+              onRefresh: controller.refresh,
               color: AppColors.primary,
               child: ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                 itemCount: list.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final ticket = list[index];
                   final tour = controller.ticketTours[ticket.tourId];
@@ -309,7 +146,7 @@ class _TicketListView extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Get.back(),
+            onPressed: Get.back,
             icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
             splashRadius: 24,
           ),
@@ -317,11 +154,7 @@ class _TicketListView extends StatelessWidget {
             child: Text(
               'Turlarım',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           IconButton(
@@ -338,16 +171,9 @@ class _TicketListView extends StatelessWidget {
     return Obx(
       () => Container(
         decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.slate800, width: 1),
-          ),
+          border: Border(bottom: BorderSide(color: AppColors.slate800, width: 1)),
         ),
-        child: Row(
-          children: [
-            _buildTab('Yaklaşan Turlar', 0),
-            _buildTab('Geçmiş Turlar', 1),
-          ],
-        ),
+        child: Row(children: [_buildTab('Yaklaşan Turlar', 0), _buildTab('Geçmiş Turlar', 1)]),
       ),
     );
   }
@@ -382,8 +208,7 @@ class _TicketListView extends StatelessWidget {
   }
 
   Widget _buildTicketCard(TicketModel ticket, TourModel? tour) {
-    final dateStr =
-        DateFormat('dd MMMM yyyy', 'tr_TR').format(ticket.purchaseDate);
+    final dateStr = DateFormat('dd MMMM yyyy', 'tr_TR').format(ticket.purchaseDate);
     final tourTitle = tour?.title ?? 'Tur';
     final companyName = tour?.guideName ?? '—';
 
@@ -419,13 +244,7 @@ class _TicketListView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  dateStr,
-                  style: const TextStyle(
-                    color: AppColors.slate300,
-                    fontSize: 12,
-                  ),
-                ),
+                Text(dateStr, style: const TextStyle(color: AppColors.slate300, fontSize: 12)),
               ],
             ),
           ),
@@ -454,12 +273,10 @@ class _ActiveTourDetailView extends StatelessWidget {
         _buildAppBar(),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: () => controller.refresh(),
+            onRefresh: controller.refresh,
             color: AppColors.primary,
             child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
-              ),
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,13 +288,9 @@ class _ActiveTourDetailView extends StatelessWidget {
                   const SizedBox(height: 24),
                   _buildVehicleCard(tour.busInfo.plate),
                   const SizedBox(height: 12),
-                  _buildGuideCard(
-                    tour.guideName ?? 'Rehber',
-                    tour.busInfo.phoneNumber,
-                  ),
+                  _buildGuideCard(tour.guideName ?? 'Rehber', tour.busInfo.phoneNumber),
                   const SizedBox(height: 28),
-                  if (program.isNotEmpty)
-                    _buildProgramSection(program, tour.createdAt),
+                  if (program.isNotEmpty) _buildProgramSection(program, tour.createdAt),
                 ],
               ),
             ),
@@ -493,23 +306,15 @@ class _ActiveTourDetailView extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Get.back(),
-            icon: const Icon(
-              Icons.chevron_left,
-              color: Colors.white,
-              size: 28,
-            ),
+            onPressed: Get.back,
+            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
             splashRadius: 24,
           ),
           const Expanded(
             child: Text(
               'Aktif Tur Detayları',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
           IconButton(
@@ -526,9 +331,9 @@ class _ActiveTourDetailView extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF22c55e).withOpacity(0.1),
+        color: AppColors.success.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF22c55e).withOpacity(0.2)),
+        border: Border.all(color: AppColors.success.withOpacity(0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -536,16 +341,13 @@ class _ActiveTourDetailView extends StatelessWidget {
           Container(
             width: 8,
             height: 8,
-            decoration: const BoxDecoration(
-              color: Color(0xFF22c55e),
-              shape: BoxShape.circle,
-            ),
+            decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
           const Text(
             'TUR AKTİF',
             style: TextStyle(
-              color: Color(0xFF22c55e),
+              color: AppColors.success,
               fontSize: 11,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
@@ -585,11 +387,7 @@ class _ActiveTourDetailView extends StatelessWidget {
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.directions_bus,
-              color: AppColors.primary,
-              size: 24,
-            ),
+            child: const Icon(Icons.directions_bus, color: AppColors.primary, size: 24),
           ),
           const SizedBox(width: 16),
           Column(
@@ -636,11 +434,7 @@ class _ActiveTourDetailView extends StatelessWidget {
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.account_circle,
-              color: AppColors.primary,
-              size: 24,
-            ),
+            child: const Icon(Icons.account_circle, color: AppColors.primary, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -700,10 +494,7 @@ class _ActiveTourDetailView extends StatelessWidget {
     );
   }
 
-  Widget _buildProgramSection(
-    List<TourProgramDay> programDays,
-    DateTime tourDate,
-  ) {
+  Widget _buildProgramSection(List<TourProgramDay> programDays, DateTime tourDate) {
     final dateStr = DateFormat('d MMMM yyyy', 'tr_TR').format(tourDate);
 
     return Column(
@@ -714,11 +505,7 @@ class _ActiveTourDetailView extends StatelessWidget {
           children: [
             const Text(
               'Tur Programı',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             Text(
               dateStr,
@@ -788,11 +575,10 @@ class _ActiveTourDetailView extends StatelessWidget {
     final titleColor = isActive
         ? AppColors.primary
         : isUpcoming
-            ? AppColors.slate300
-            : Colors.white;
+        ? AppColors.slate300
+        : Colors.white;
     final descColor = isUpcoming ? AppColors.slate500 : AppColors.slate400;
-    final timeBgColor =
-        isActive ? AppColors.primary.withOpacity(0.2) : AppColors.slate800;
+    final timeBgColor = isActive ? AppColors.primary.withOpacity(0.2) : AppColors.slate800;
     final timeTextColor = isActive ? AppColors.primary : AppColors.slate400;
     final orderText = '${order.toString().padLeft(2, '0')}:00';
     final description = activities.isNotEmpty ? activities.join('\n') : '';
@@ -816,15 +602,11 @@ class _ActiveTourDetailView extends StatelessWidget {
                   child: Container(
                     width: 6,
                     height: 6,
-                    decoration: BoxDecoration(
-                      color: dotInnerColor,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: BoxDecoration(color: dotInnerColor, shape: BoxShape.circle),
                   ),
                 ),
               ),
-              if (!isLast)
-                Container(width: 2, height: 72, color: AppColors.slate800),
+              if (!isLast) Container(width: 2, height: 72, color: AppColors.slate800),
             ],
           ),
         ),
@@ -850,10 +632,7 @@ class _ActiveTourDetailView extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: timeBgColor,
                         borderRadius: BorderRadius.circular(4),
@@ -878,8 +657,7 @@ class _ActiveTourDetailView extends StatelessWidget {
                       color: descColor,
                       fontSize: 14,
                       height: 1.4,
-                      fontWeight:
-                          isActive ? FontWeight.w500 : FontWeight.normal,
+                      fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
                     ),
                   ),
                 ],

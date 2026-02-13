@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:turassist/config/colors.dart';
+
+import '../config/colors.dart';
 
 class IncludedItem extends StatelessWidget {
   final IconData icon;
@@ -15,10 +16,10 @@ class IncludedItem extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: AppColors.greenAccent.withOpacity(0.1),
+            color: AppColors.success.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: AppColors.greenAccent, size: 18),
+          child: Icon(icon, color: AppColors.success, size: 18),
         ),
         const SizedBox(width: 12),
         Expanded(

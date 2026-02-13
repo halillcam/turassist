@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:turassist/config/colors.dart';
+
+import '../../config/colors.dart';
 
 class TourManagerCustomersScreen extends StatefulWidget {
   const TourManagerCustomersScreen({super.key});
@@ -74,7 +75,7 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
         children: [
           // Geri
           GestureDetector(
-            onTap: () => Get.back(),
+            onTap: Get.back,
             child: Container(
               width: 40,
               height: 40,
@@ -124,17 +125,17 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF1a2632),
+          color: AppColors.cardDark,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF324d67)),
+          border: Border.all(color: AppColors.slate700),
         ),
         child: Row(
           children: [
             _statItem('TOPLAM', '${_allParticipants.length}', AppColors.white),
             _divider(),
-            _statItem('GELEN', '$_arrivedCount', const Color(0xFF10b981)),
+            _statItem('GELEN', '$_arrivedCount', AppColors.success),
             _divider(),
-            _statItem('BEKLENEN', '$_pendingCount', const Color(0xFFf43f5e)),
+            _statItem('BEKLENEN', '$_pendingCount', AppColors.error),
           ],
         ),
       ),
@@ -179,12 +180,12 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
             height: 42,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFF233648),
+              color: AppColors.slate800,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                Icon(Icons.search, color: const Color(0xFF92adc9), size: 20),
+                Icon(Icons.search, color: AppColors.slate400, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
@@ -193,7 +194,7 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
                     style: const TextStyle(color: AppColors.white, fontSize: 14),
                     decoration: InputDecoration(
                       hintText: 'Katılımcı ara...',
-                      hintStyle: TextStyle(color: const Color(0xFF92adc9), fontSize: 14),
+                      hintStyle: TextStyle(color: AppColors.slate400, fontSize: 14),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
@@ -206,7 +207,7 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
           // Tabs
           Container(
             decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: const Color(0xFF324d67), width: 1)),
+              border: Border(bottom: BorderSide(color: AppColors.slate700, width: 1)),
             ),
             child: Row(
               children: [
@@ -237,7 +238,7 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
         child: Text(
           label,
           style: TextStyle(
-            color: isActive ? AppColors.white : const Color(0xFF92adc9),
+            color: isActive ? AppColors.white : AppColors.slate400,
             fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
@@ -261,7 +262,7 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
           child: ListView.separated(
             padding: EdgeInsets.zero,
             itemCount: participants.length,
-            separatorBuilder: (_, __) => Container(height: 1, color: AppColors.slate800),
+            separatorBuilder: (_, _) => Container(height: 1, color: AppColors.slate800),
             itemBuilder: (context, index) {
               return _buildParticipantTile(participants[index]);
             },
@@ -280,11 +281,11 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
         .toUpperCase();
 
     final borderColor = participant.arrived
-        ? const Color(0xFF10b981).withOpacity(0.3)
+        ? AppColors.success.withOpacity(0.3)
         : AppColors.slate800;
 
     return Container(
-      color: const Color(0xFF111a22),
+      color: AppColors.slate900,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
@@ -335,7 +336,7 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
                   children: [
                     Text(
                       participant.phone,
-                      style: const TextStyle(color: Color(0xFF92adc9), fontSize: 12),
+                      style: const TextStyle(color: AppColors.slate400, fontSize: 12),
                     ),
                     if (participant.isVip) ...[
                       const SizedBox(width: 6),
@@ -372,14 +373,10 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: arrived
-            ? const Color(0xFF10b981).withOpacity(0.1)
-            : const Color(0xFFf43f5e).withOpacity(0.1),
+        color: arrived ? AppColors.success.withOpacity(0.1) : AppColors.error.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: arrived
-              ? const Color(0xFF10b981).withOpacity(0.2)
-              : const Color(0xFFf43f5e).withOpacity(0.2),
+          color: arrived ? AppColors.success.withOpacity(0.2) : AppColors.error.withOpacity(0.2),
         ),
       ),
       child: Row(
@@ -387,14 +384,14 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
         children: [
           Icon(
             arrived ? Icons.check_circle : Icons.cancel,
-            color: arrived ? const Color(0xFF10b981) : const Color(0xFFf43f5e),
+            color: arrived ? AppColors.success : AppColors.error,
             size: 18,
           ),
           const SizedBox(width: 6),
           Text(
             arrived ? 'Geldi' : 'Gelmedi',
             style: TextStyle(
-              color: arrived ? const Color(0xFF34d399) : const Color(0xFFfb7185),
+              color: arrived ? AppColors.successLight : AppColors.errorLight,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),

@@ -1,11 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+
+import '../models/announcement_model.dart';
+import '../models/chat_model.dart';
+import '../models/ticket_model.dart';
 import '../models/tour_model.dart';
 import '../models/tour_program_model.dart';
-import '../models/ticket_model.dart';
 import '../models/user_model.dart';
-import '../models/chat_model.dart';
-import '../models/announcement_model.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -20,9 +22,9 @@ class FirebaseService {
           .where('isDeleted', isEqualTo: false)
           .get();
 
-      return snapshot.docs.map((doc) => TourModel.fromFirestore(doc)).toList();
+      return snapshot.docs.map(TourModel.fromFirestore).toList();
     } catch (e) {
-      print("Error fetching tours: $e");
+      debugPrint('Error fetching tours: $e');
       return [];
     }
   }
@@ -36,7 +38,7 @@ class FirebaseService {
           .where('isDeleted', isEqualTo: false)
           .get();
 
-      return snapshot.docs.map((doc) => TourModel.fromFirestore(doc)).toList();
+      return snapshot.docs.map(TourModel.fromFirestore).toList();
     } catch (e) {
       return [];
     }
@@ -48,7 +50,7 @@ class FirebaseService {
       final snapshot = await _firestore.collection('cities').get();
       return snapshot.docs.map((doc) => doc['name'] as String).toList();
     } catch (e) {
-      print("Error fetching cities: $e");
+      debugPrint('Error fetching cities: $e');
       return [];
     }
   }
@@ -62,7 +64,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print("Error fetching tour: $e");
+      debugPrint('Error fetching tour: $e');
       return null;
     }
   }
@@ -77,9 +79,9 @@ class FirebaseService {
           .orderBy('order', descending: false)
           .get();
 
-      return snapshot.docs.map((doc) => TourProgramDay.fromFirestore(doc)).toList();
+      return snapshot.docs.map(TourProgramDay.fromFirestore).toList();
     } catch (e) {
-      print("Error fetching tour program: $e");
+      debugPrint('Error fetching tour program: $e');
       return [];
     }
   }
@@ -89,7 +91,7 @@ class FirebaseService {
     try {
       await _firestore.collection('tours').doc(tourId).update(tour.toJson());
     } catch (e) {
-      print("Error updating tour: $e");
+      debugPrint('Error updating tour: $e');
     }
   }
 
@@ -104,7 +106,7 @@ class FirebaseService {
 
       return snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
     } catch (e) {
-      print("Error fetching tour participants: $e");
+      debugPrint('Error fetching tour participants: $e');
       return [];
     }
   }
@@ -129,7 +131,7 @@ class FirebaseService {
         await doc.reference.update({'qrToken': null, 'isScanned': true});
       }
     } catch (e) {
-      print("Error finishing tour: $e");
+      debugPrint('Error finishing tour: $e');
     }
   }
 
@@ -141,7 +143,7 @@ class FirebaseService {
       await docRef.set(ticket.toJson());
       return docRef.id;
     } catch (e) {
-      print("Error creating ticket: $e");
+      debugPrint('Error creating ticket: $e');
       throw Exception("Bilet oluşturma başarısız");
     }
   }
@@ -156,7 +158,7 @@ class FirebaseService {
       if (!doc.exists) return null;
       return UserModel.fromFirestore(doc);
     } catch (e) {
-      print("getUserProfile Error: $e");
+      debugPrint('getUserProfile Error: $e');
       return null;
     }
   }
@@ -173,9 +175,9 @@ class FirebaseService {
           .orderBy('purchaseDate', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => TicketModel.fromFirestore(doc)).toList();
+      return snapshot.docs.map(TicketModel.fromFirestore).toList();
     } catch (e) {
-      print("Error fetching user tickets: $e");
+      debugPrint('Error fetching user tickets: $e');
       return [];
     }
   }
@@ -190,7 +192,7 @@ class FirebaseService {
 
       return qrToken;
     } catch (e) {
-      print("QR Token Generation Error: $e");
+      debugPrint('QR Token Generation Error: $e');
       throw Exception("QR token oluşturulamadı");
     }
   }
@@ -200,7 +202,7 @@ class FirebaseService {
     try {
       await _firestore.collection('tickets').doc(ticketId).update({'qrToken': qrToken});
     } catch (e) {
-      print("QR Token Update Error: $e");
+      debugPrint('QR Token Update Error: $e');
     }
   }
 
@@ -214,7 +216,7 @@ class FirebaseService {
       });
       return true;
     } catch (e) {
-      print("QR Scan Error: $e");
+      debugPrint('QR Scan Error: $e');
       return false;
     }
   }
@@ -227,7 +229,7 @@ class FirebaseService {
       });
       return true;
     } catch (e) {
-      print("Ticket Status Update Error: $e");
+      debugPrint('Ticket Status Update Error: $e');
       return false;
     }
   }
@@ -238,7 +240,7 @@ class FirebaseService {
     try {
       await _firestore.collection('tours').doc(tourId).collection('messages').add(message.toJson());
     } catch (e) {
-      print("Chat Error: $e");
+      debugPrint('Chat Error: $e');
     }
   }
 
@@ -251,7 +253,7 @@ class FirebaseService {
         .orderBy('timestamp', descending: false)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) => ChatModel.fromFirestore(doc)).toList();
+          return snapshot.docs.map(ChatModel.fromFirestore).toList();
         });
   }
 
@@ -265,9 +267,9 @@ class FirebaseService {
           .orderBy('timestamp', descending: false)
           .get();
 
-      return snapshot.docs.map((doc) => ChatModel.fromFirestore(doc)).toList();
+      return snapshot.docs.map(ChatModel.fromFirestore).toList();
     } catch (e) {
-      print("Error fetching chat messages: $e");
+      debugPrint('Error fetching chat messages: $e');
       return [];
     }
   }
@@ -282,7 +284,7 @@ class FirebaseService {
           .doc(messageId)
           .delete();
     } catch (e) {
-      print("Error deleting message: $e");
+      debugPrint('Error deleting message: $e');
     }
   }
 
@@ -295,7 +297,7 @@ class FirebaseService {
           .collection('announcements')
           .add(announcement.toJson());
     } catch (e) {
-      print("Announcement Error: $e");
+      debugPrint('Announcement Error: $e');
     }
   }
 
@@ -308,7 +310,7 @@ class FirebaseService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) => AnnouncementModel.fromFirestore(doc)).toList();
+          return snapshot.docs.map(AnnouncementModel.fromFirestore).toList();
         });
   }
 
@@ -322,9 +324,9 @@ class FirebaseService {
           .orderBy('createdAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => AnnouncementModel.fromFirestore(doc)).toList();
+      return snapshot.docs.map(AnnouncementModel.fromFirestore).toList();
     } catch (e) {
-      print("Error fetching announcements: $e");
+      debugPrint('Error fetching announcements: $e');
       return [];
     }
   }
@@ -339,7 +341,7 @@ class FirebaseService {
           .doc(announcementId)
           .delete();
     } catch (e) {
-      print("Error deleting announcement: $e");
+      debugPrint('Error deleting announcement: $e');
     }
   }
 
@@ -365,7 +367,7 @@ class FirebaseService {
         });
       }
     } catch (e) {
-      print("Error sending notification: $e");
+      debugPrint('Error sending notification: $e');
     }
   }
 
@@ -399,7 +401,7 @@ class FirebaseService {
       await _firestore.collection('users').doc(userId).set(newUser.toJson());
       return newUser;
     } catch (e) {
-      print("Registration Error: $e");
+      debugPrint('Registration Error: $e');
       throw Exception("Kayıt başarısız: ${e.toString()}");
     }
   }
@@ -409,7 +411,7 @@ class FirebaseService {
     try {
       await _auth.signOut();
     } catch (e) {
-      print("Logout Error: $e");
+      debugPrint('Logout Error: $e');
       throw Exception("Çıkış başarısız");
     }
   }
@@ -419,7 +421,7 @@ class FirebaseService {
     try {
       await _auth.sendPasswordResetEmail(email: email);
     } catch (e) {
-      print("Password Reset Error: $e");
+      debugPrint('Password Reset Error: $e');
       throw Exception("Şifre sıfırlama hatası");
     }
   }
@@ -488,7 +490,7 @@ class FirebaseService {
 
       return UserModel.fromFirestore(doc);
     } catch (e) {
-      print("Guide Login Error: $e");
+      debugPrint('Guide Login Error: $e');
       throw Exception(e.toString());
     }
   }

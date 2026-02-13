@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:turassist/config/colors.dart';
-import 'package:turassist/config/app_routes.dart';
-import 'package:turassist/controllers/tour_controller.dart';
-import 'package:turassist/controllers/city_controller.dart';
-import 'package:turassist/models/tour_model.dart';
-import 'package:turassist/models/city_model.dart';
-import 'package:turassist/widgets/index.dart';
+
+import '../../config/app_routes.dart';
+import '../../config/colors.dart';
+import '../../controllers/city_controller.dart';
+import '../../controllers/tour_controller.dart';
+import '../../models/city_model.dart';
+import '../../models/tour_model.dart';
+import '../../widgets/index.dart';
 
 class TourListScreen extends StatefulWidget {
-  const TourListScreen({Key? key}) : super(key: key);
+  const TourListScreen({super.key});
 
   @override
   State<TourListScreen> createState() => _TourListScreenState();

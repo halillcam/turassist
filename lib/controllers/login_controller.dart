@@ -1,7 +1,9 @@
-import 'package:get/get.dart';
-import '../services/firebase_service.dart';
-import '../models/user_model.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../config/colors.dart';
+import '../models/user_model.dart';
+import '../services/firebase_service.dart';
 
 class LoginController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
@@ -25,7 +27,7 @@ class LoginController extends GetxController {
         "Hata",
         e.toString().replaceAll("Exception:", ""),
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {
@@ -52,7 +54,7 @@ class LoginController extends GetxController {
         Get.snackbar(
           "Hata",
           "Bu hesap mobile app'te kullanılamaz. Web admin panelini kullanınız.",
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           colorText: Colors.white,
         );
         Get.offAllNamed('/login');
@@ -71,7 +73,7 @@ class LoginController extends GetxController {
           "Başarılı",
           "Hoşgeldiniz ${user.fullName}",
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.success,
           colorText: Colors.white,
         );
         _navigateBasedOnRole(user);
@@ -81,7 +83,7 @@ class LoginController extends GetxController {
         "Hata",
         e.toString().replaceAll("Exception:", ""),
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {
@@ -109,7 +111,7 @@ class LoginController extends GetxController {
           "Başarılı",
           "Kayıt başarılı! Lütfen giriş yapınız.",
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.success,
           colorText: Colors.white,
         );
         Get.offAllNamed('/login');
@@ -119,7 +121,7 @@ class LoginController extends GetxController {
         "Hata",
         e.toString().replaceAll("Exception:", ""),
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {
@@ -138,7 +140,7 @@ class LoginController extends GetxController {
         "Hata",
         "Çıkış işlemi başarısız: $e",
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {
@@ -155,7 +157,7 @@ class LoginController extends GetxController {
         "Başarılı",
         "Şifre sıfırlama linki $email adresine gönderildi.",
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.success,
         colorText: Colors.white,
       );
     } catch (e) {
@@ -163,7 +165,7 @@ class LoginController extends GetxController {
         "Hata",
         e.toString().replaceAll("Exception:", ""),
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.redAccent,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {

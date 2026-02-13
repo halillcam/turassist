@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../config/colors.dart';
+
 class LoginHeader extends StatelessWidget {
-  const LoginHeader({Key? key}) : super(key: key);
+  const LoginHeader({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -10,11 +12,11 @@ class LoginHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Color(0xFF137fec),
+            color: AppColors.primary,
             borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
-                color: Color(0xFF137fec).withOpacity(0.4),
+                color: AppColors.primary.withOpacity(0.4),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),

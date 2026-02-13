@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:turassist/config/colors.dart';
+
+import '../../config/colors.dart';
 
 class QrScannerScreen extends StatefulWidget {
   const QrScannerScreen({super.key});
@@ -34,7 +35,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0a0f14),
+      backgroundColor: AppColors.scannerBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -57,7 +58,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
         children: [
           // Close button
           GestureDetector(
-            onTap: () => Get.back(),
+            onTap: Get.back,
             child: Container(
               width: 48,
               height: 48,
@@ -89,11 +90,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: Colors.green,
+                      color: AppColors.success,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.green.withOpacity(0.6),
+                          color: AppColors.success.withOpacity(0.6),
                           blurRadius: 8,
                           spreadRadius: 1,
                         ),

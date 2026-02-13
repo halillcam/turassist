@@ -755,7 +755,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
                       children: [
                         _buildSectionTitle('İşlem Logları'),
                         TextButton(
-                          onPressed: () => setState(() => _logMessages.clear()),
+                          onPressed: () => setState(_logMessages.clear),
                           child: const Text(
                             'Temizle',
                             style: TextStyle(color: AppColors.slate400, fontSize: 12),

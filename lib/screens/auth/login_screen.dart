@@ -1,12 +1,15 @@
+import 'dart:ui';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:turassist/controllers/login_controller.dart';
-import 'dart:ui';
-import 'package:turassist/widgets/index.dart';
-import 'package:flutter/gestures.dart';
+
+import '../../config/colors.dart';
+import '../../controllers/login_controller.dart';
+import '../../widgets/index.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -69,57 +72,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 16),
 
-                    // TEST BUTTON - TO BE REMOVED
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Get.toNamed('/city-selection'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.withOpacity(0.8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text(
-                          'TEST: Şehir Seçme Ekranına Git',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-
+                    // Test butonları
+                    _buildTestCitySelectionButton(),
                     const SizedBox(height: 8),
-
-                    // TEST BUTTON - Tur Ekleme Ekranı - TO BE REMOVED
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => Get.toNamed('/test-tour'),
-                        icon: const Icon(Icons.science, color: Colors.white, size: 18),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple.withOpacity(0.8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        label: const Text(
-                          'TEST: Tur Verisi Ekle (Firestore)',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-
-                    // TEST BUTTON - Tur Sorumlusu Paneli - TO BE REMOVED
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => Get.toNamed('/tour-manager-home'),
-                        icon: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 18),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal.withOpacity(0.8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        label: const Text(
-                          'TEST: Tur Sorumlusu Paneli',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
+                    _buildTestTourDataButton(),
+                    _buildTestTourManagerButton(),
 
                     const SizedBox(height: 16),
                   ],
@@ -178,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Text(
                     'Şifremi Unuttum',
                     style: TextStyle(
-                      color: Color(0xFF137fec),
+                      color: AppColors.primary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -209,7 +166,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextSpan(
                         text: 'Kayıt Ol',
                         style: TextStyle(
-                          color: Color(0xFF137fec),
+                          color: AppColors.primary,
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -283,9 +240,9 @@ class _LoginScreenState extends State<LoginScreen> {
         () => ElevatedButton(
           onPressed: _loginController.isLoading.value ? null : _handleLogin,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF137fec),
-            disabledBackgroundColor: Color(0xFF137fec).withOpacity(0.5),
-            shadowColor: Color(0xFF137fec).withOpacity(0.4),
+            backgroundColor: AppColors.primary,
+            disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+            shadowColor: AppColors.primary.withOpacity(0.4),
             elevation: 12,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -329,10 +286,7 @@ class _LoginScreenState extends State<LoginScreen> {
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: () {
-          // Google Sign In fonksiyonu çağır
-          _handleGoogleSignIn();
-        },
+        onPressed: _handleGoogleSignIn,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
@@ -406,6 +360,55 @@ class _LoginScreenState extends State<LoginScreen> {
       'Uyarı',
       'Google Sign In henüz entegre edilmemiştir.',
       snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  // ─── Test Butonları ───
+
+  Widget _buildTestCitySelectionButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () => Get.toNamed('/city-selection'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.success.withOpacity(0.8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: const Text('TEST: Şehir Seçme Ekranına Git', style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _buildTestTourDataButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => Get.toNamed('/test-tour'),
+        icon: const Icon(Icons.science, color: Colors.white, size: 18),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.deepPurple.withOpacity(0.8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        label: const Text(
+          'TEST: Tur Verisi Ekle (Firestore)',
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTestTourManagerButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => Get.toNamed('/tour-manager-home'),
+        icon: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 18),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.teal.withOpacity(0.8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        label: const Text('TEST: Tur Sorumlusu Paneli', style: TextStyle(color: Colors.white)),
+      ),
     );
   }
 }

@@ -1,14 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:turassist/config/colors.dart';
-import 'package:turassist/config/app_routes.dart';
-import 'package:turassist/models/city_model.dart';
-import 'package:turassist/controllers/city_controller.dart';
-import 'package:turassist/controllers/tour_controller.dart';
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../config/app_routes.dart';
+import '../../config/colors.dart';
+import '../../controllers/city_controller.dart';
+import '../../controllers/tour_controller.dart';
+import '../../models/city_model.dart';
+
 class CityChoiceScreen extends StatefulWidget {
-  const CityChoiceScreen({Key? key}) : super(key: key);
+  const CityChoiceScreen({super.key});
 
   @override
   State<CityChoiceScreen> createState() => _CityChoiceScreenState();
@@ -206,7 +208,7 @@ class _CityChoiceScreenState extends State<CityChoiceScreen> with TickerProvider
       return GestureDetector(
         onTapDown: city.isAvailable ? (_) => controller.forward() : null,
         onTapUp: city.isAvailable ? (_) => controller.reverse() : null,
-        onTapCancel: city.isAvailable ? () => controller.reverse() : null,
+        onTapCancel: city.isAvailable ? controller.reverse : null,
         onTap: city.isAvailable ? () => _selectCity(city) : null,
         child: ScaleTransition(
           scale: Tween<double>(begin: 1.0, end: 0.95).animate(controller),

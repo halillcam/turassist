@@ -1,7 +1,9 @@
-import 'package:get/get.dart';
 import 'package:flutter/material.dart';
-import '../services/firebase_service.dart';
+import 'package:get/get.dart';
+
+import '../config/colors.dart';
 import '../models/chat_model.dart';
+import '../services/firebase_service.dart';
 
 class ChatController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
@@ -24,7 +26,7 @@ class ChatController extends GetxController {
       var result = await _firebaseService.getAllChatMessages(tourId);
       messages.assignAll(result);
     } catch (e) {
-      print('Mesajları yüklerken hata: $e');
+      debugPrint('Mesajları yüklerken hata: $e');
     } finally {
       isLoading.value = false;
     }
@@ -50,7 +52,7 @@ class ChatController extends GetxController {
       // Servise objeyi gönderiyoruz
       await _firebaseService.sendChatMessage(tourId, newMessage);
     } catch (e) {
-      print('Mesaj gönderme hatası: $e');
+      debugPrint('Mesaj gönderme hatası: $e');
     }
   }
 
@@ -62,14 +64,14 @@ class ChatController extends GetxController {
       Get.snackbar(
         "Başarılı",
         "Tur chatı açıldı.",
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.success,
         colorText: Colors.white,
       );
     } catch (e) {
       Get.snackbar(
         "Hata",
         "Chat başlatma başarısız: $e",
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     }
@@ -81,7 +83,7 @@ class ChatController extends GetxController {
       await _firebaseService.deleteChatMessage(tourId, messageId);
       messages.removeWhere((m) => m.id == messageId);
     } catch (e) {
-      print('Mesaj silme hatası: $e');
+      debugPrint('Mesaj silme hatası: $e');
     }
   }
 }

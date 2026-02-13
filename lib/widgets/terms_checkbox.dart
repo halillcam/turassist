@@ -1,14 +1,15 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
+import '../config/colors.dart';
 
 class TermsCheckbox extends StatelessWidget {
   final RxBool isChecked;
   final VoidCallback? onTermsTap;
   final VoidCallback? onPrivacyTap;
 
-  const TermsCheckbox({Key? key, required this.isChecked, this.onTermsTap, this.onPrivacyTap})
-    : super(key: key);
+  const TermsCheckbox({super.key, required this.isChecked, this.onTermsTap, this.onPrivacyTap});
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +18,7 @@ class TermsCheckbox extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onTap: () => isChecked.toggle(),
+            onTap: isChecked.toggle,
             child: Container(
               width: 20,
               height: 20,
@@ -25,7 +26,7 @@ class TermsCheckbox extends StatelessWidget {
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
                 borderRadius: BorderRadius.circular(4),
-                color: isChecked.value ? Color(0xFF137fec) : Colors.transparent,
+                color: isChecked.value ? AppColors.primary : Colors.transparent,
               ),
               child: isChecked.value ? Icon(Icons.check, color: Colors.white, size: 14) : null,
             ),
@@ -39,7 +40,7 @@ class TermsCheckbox extends StatelessWidget {
                   TextSpan(
                     text: 'Kullanım Koşullarını',
                     style: TextStyle(
-                      color: Color(0xFF137fec),
+                      color: AppColors.primary,
                       fontWeight: FontWeight.w600,
                       decoration: TextDecoration.underline,
                     ),
@@ -49,7 +50,7 @@ class TermsCheckbox extends StatelessWidget {
                   TextSpan(
                     text: 'Gizlilik Politikasını',
                     style: TextStyle(
-                      color: Color(0xFF137fec),
+                      color: AppColors.primary,
                       fontWeight: FontWeight.w600,
                       decoration: TextDecoration.underline,
                     ),

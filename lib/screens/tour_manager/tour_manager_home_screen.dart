@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:turassist/config/colors.dart';
+
+import '../../config/colors.dart';
 
 class TourManagerHomeScreen extends StatelessWidget {
   const TourManagerHomeScreen({super.key});
@@ -88,7 +89,10 @@ class TourManagerHomeScreen extends StatelessWidget {
                     letterSpacing: -0.3,
                   ),
                 ),
-                Text('Yönetici Portalı', style: TextStyle(color: AppColors.slate400, fontSize: 12)),
+                Text(
+                  'Yönetici Portalı',
+                  style: TextStyle(color: AppColors.slate400, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -105,7 +109,7 @@ class TourManagerHomeScreen extends StatelessWidget {
           const SizedBox(width: 8),
           // Settings button
           GestureDetector(
-            onTap: () => _showSettingsSheet(),
+            onTap: _showSettingsSheet,
             child: Container(
               width: 40,
               height: 40,
@@ -144,13 +148,11 @@ class TourManagerHomeScreen extends StatelessWidget {
   Widget _buildStatCards() {
     return Row(
       children: [
-        Expanded(
-          child: _statCard('TOPLAM KATILIMCI', '24', '%100 Doluluk', const Color(0xFF0bda5b)),
-        ),
+        Expanded(child: _statCard('TOPLAM KATILIMCI', '24', '%100 Doluluk', AppColors.success)),
         const SizedBox(width: 12),
         Expanded(
           child: _statCard(
-            'GİRİŞ YAPILDI',
+            'GİRİÅ YAPILDI',
             '18',
             '%75 Tamamlandı',
             AppColors.primary,
@@ -165,7 +167,7 @@ class TourManagerHomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1c2a38),
+        color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.slate700),
       ),
@@ -219,7 +221,7 @@ class TourManagerHomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1c2a38),
+        color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.slate700),
       ),
@@ -311,13 +313,13 @@ class TourManagerHomeScreen extends StatelessWidget {
         // Katılımcıları Gör
         _managementTile(
           icon: Icons.checklist_rtl,
-          iconColor: Colors.green,
+          iconColor: AppColors.success,
           iconBgColor: AppColors.primary.withOpacity(0.1),
           title: 'Katılımcıları Gör',
           subtitle: null,
           badges: [
-            _badge(Icons.check_circle, '18 Giriş', Colors.green),
-            _badge(Icons.cancel, '6 Bekliyor', Colors.red),
+            _badge(Icons.check_circle, '18 Giriş', AppColors.success),
+            _badge(Icons.cancel, '6 Bekliyor', AppColors.error),
           ],
           showNotification: true,
           onTap: () {
@@ -328,8 +330,8 @@ class TourManagerHomeScreen extends StatelessWidget {
         // Duyuru Yap
         _managementTile(
           icon: Icons.campaign,
-          iconColor: Colors.orange,
-          iconBgColor: Colors.orange.withOpacity(0.12),
+          iconColor: AppColors.warning,
+          iconBgColor: AppColors.warning.withOpacity(0.12),
           title: 'Duyuru Yap',
           subtitle: 'Tüm katılımcılara bildirim gönder',
           onTap: () {
@@ -340,8 +342,8 @@ class TourManagerHomeScreen extends StatelessWidget {
         // Sohbete Göz At
         _managementTile(
           icon: Icons.forum,
-          iconColor: Colors.green,
-          iconBgColor: Colors.green.withOpacity(0.12),
+          iconColor: AppColors.success,
+          iconBgColor: AppColors.success.withOpacity(0.12),
           title: 'Sohbete Göz At',
           subtitle: 'Gruptan 3 okunmamış mesaj',
           showDot: true,
@@ -372,7 +374,7 @@ class TourManagerHomeScreen extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1c2a38),
+            color: AppColors.cardDark,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.slate700),
           ),
@@ -399,9 +401,9 @@ class TourManagerHomeScreen extends StatelessWidget {
                         width: 16,
                         height: 16,
                         decoration: BoxDecoration(
-                          color: Colors.red,
+                          color: AppColors.error,
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF1c2a38), width: 2),
+                          border: Border.all(color: AppColors.cardDark, width: 2),
                         ),
                         child: const Icon(Icons.person_off, color: AppColors.white, size: 8),
                       ),
@@ -414,9 +416,9 @@ class TourManagerHomeScreen extends StatelessWidget {
                         width: 14,
                         height: 14,
                         decoration: BoxDecoration(
-                          color: Colors.red,
+                          color: AppColors.error,
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF1c2a38), width: 2),
+                          border: Border.all(color: AppColors.cardDark, width: 2),
                         ),
                       ),
                     ),
@@ -478,7 +480,7 @@ class TourManagerHomeScreen extends StatelessWidget {
       Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         decoration: const BoxDecoration(
-          color: Color(0xFF1c2a38),
+          color: AppColors.cardDark,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -499,17 +501,14 @@ class TourManagerHomeScreen extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  Get.back();
-                  // TODO: Finish tour logic
-                },
+                onPressed: Get.back,
                 icon: const Icon(Icons.event_available, size: 20),
                 label: const Text(
                   'Turu Bitir',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade700,
+                  backgroundColor: AppColors.error,
                   foregroundColor: AppColors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,

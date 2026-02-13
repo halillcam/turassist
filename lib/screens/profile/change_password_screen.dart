@@ -1,117 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:turassist/config/colors.dart';
 
-class ChangePasswordController extends GetxController {
-  final currentPasswordController = TextEditingController();
-  final newPasswordController = TextEditingController();
-  final confirmPasswordController = TextEditingController();
-
-  final RxBool isLoading = false.obs;
-  final RxBool showCurrentPassword = false.obs;
-  final RxBool showNewPassword = false.obs;
-  final RxBool showConfirmPassword = false.obs;
-
-  @override
-  void onClose() {
-    currentPasswordController.dispose();
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
-    super.onClose();
-  }
-
-  Future<void> changePassword() async {
-    final currentPassword = currentPasswordController.text.trim();
-    final newPassword = newPasswordController.text.trim();
-    final confirmPassword = confirmPasswordController.text.trim();
-
-    if (currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
-      Get.snackbar(
-        'Hata',
-        'Tüm alanları doldurunuz',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      Get.snackbar(
-        'Hata',
-        'Yeni şifre en az 6 karakter olmalıdır',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-      return;
-    }
-
-    if (newPassword != confirmPassword) {
-      Get.snackbar(
-        'Hata',
-        'Yeni şifreler eşleşmiyor',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-      return;
-    }
-
-    isLoading.value = true;
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null || user.email == null) throw Exception('Kullanıcı bulunamadı');
-
-      // Re-authenticate
-      final credential = EmailAuthProvider.credential(
-        email: user.email!,
-        password: currentPassword,
-      );
-      await user.reauthenticateWithCredential(credential);
-
-      // Update password
-      await user.updatePassword(newPassword);
-
-      Get.snackbar(
-        'Başarılı',
-        'Şifreniz başarıyla güncellendi',
-        backgroundColor: AppColors.primary.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-
-      Get.back();
-    } on FirebaseAuthException catch (e) {
-      String message = 'Bir hata oluştu';
-      if (e.code == 'wrong-password') {
-        message = 'Mevcut şifreniz hatalı';
-      } else if (e.code == 'weak-password') {
-        message = 'Yeni şifre çok zayıf';
-      } else if (e.code == 'requires-recent-login') {
-        message = 'Lütfen yeniden giriş yapınız';
-      }
-      Get.snackbar(
-        'Hata',
-        message,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-    } catch (e) {
-      Get.snackbar(
-        'Hata',
-        'Şifre değiştirilirken bir hata oluştu',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-      );
-    } finally {
-      isLoading.value = false;
-    }
-  }
-}
+import '../../config/colors.dart';
+import '../../controllers/change_password_controller.dart';
 
 class ChangePasswordScreen extends StatelessWidget {
   const ChangePasswordScreen({super.key});
@@ -132,7 +23,7 @@ class ChangePasswordScreen extends StatelessWidget {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Get.back(),
+          onPressed: Get.back,
         ),
       ),
       body: SingleChildScrollView(
@@ -150,7 +41,7 @@ class ChangePasswordScreen extends StatelessWidget {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.primary, Color(0xFF0d5bab)],
+                    colors: [AppColors.primary, AppColors.primaryDark],
                   ),
                   boxShadow: [
                     BoxShadow(

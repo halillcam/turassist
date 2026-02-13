@@ -1,55 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:turassist/config/app_routes.dart';
-import 'package:turassist/config/colors.dart';
-import 'package:turassist/models/user_model.dart';
-import 'package:turassist/screens/profile/edit_profile_screen.dart';
-import 'package:turassist/screens/profile/change_password_screen.dart';
-import 'package:turassist/services/firebase_service.dart';
-import 'package:turassist/widgets/index.dart';
 
-class ProfileController extends GetxController {
-  final FirebaseService _firebaseService = FirebaseService();
-  final Rx<UserModel?> user = Rx<UserModel?>(null);
-  final RxBool isLoading = true.obs;
-  final RxBool notificationsEnabled = true.obs;
-
-  @override
-  void onInit() {
-    super.onInit();
-    loadUserProfile();
-  }
-
-  Future<void> loadUserProfile() async {
-    isLoading.value = true;
-    user.value = await _firebaseService.getUserProfile();
-    isLoading.value = false;
-  }
-
-  String getInitials() {
-    final name = user.value?.fullName ?? '';
-    if (name.isEmpty) return '?';
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length >= 2) {
-      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-    }
-    return parts.first[0].toUpperCase();
-  }
-
-  Future<void> logout() async {
-    try {
-      await _firebaseService.logout();
-      Get.offAllNamed(AppRoutes.login);
-    } catch (e) {
-      Get.snackbar(
-        'Hata',
-        'Çıkış yapılırken bir hata oluştu',
-        backgroundColor: Colors.red.withOpacity(0.8),
-        colorText: Colors.white,
-      );
-    }
-  }
-}
+import '../../config/app_routes.dart';
+import '../../config/colors.dart';
+import '../../controllers/profile_controller.dart';
+import '../../models/user_model.dart';
+import '../../widgets/index.dart';
+import 'change_password_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -128,7 +86,7 @@ class ProfileScreen extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [AppColors.primary, Color(0xFF0d5bab)],
+              colors: [AppColors.primary, AppColors.primaryDark],
             ),
             boxShadow: [
               BoxShadow(
@@ -343,7 +301,7 @@ class ProfileScreen extends StatelessWidget {
               backgroundColor: AppColors.cardDark,
               confirm: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFef4444),
+                  backgroundColor: AppColors.error,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -359,7 +317,7 @@ class ProfileScreen extends StatelessWidget {
                   side: const BorderSide(color: AppColors.slate600),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                onPressed: () => Get.back(),
+                onPressed: Get.back,
                 child: const Text('İptal'),
               ),
             );
@@ -368,19 +326,19 @@ class ProfileScreen extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              color: const Color(0xFFef4444).withOpacity(0.1),
+              color: AppColors.error.withOpacity(0.1),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFef4444).withOpacity(0.3)),
+              border: Border.all(color: AppColors.error.withOpacity(0.3)),
             ),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.logout_rounded, color: Color(0xFFef4444), size: 22),
+                Icon(Icons.logout_rounded, color: AppColors.error, size: 22),
                 SizedBox(width: 10),
                 Text(
                   'Çıkış Yap',
                   style: TextStyle(
-                    color: Color(0xFFef4444),
+                    color: AppColors.error,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),

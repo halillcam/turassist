@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../services/firebase_service.dart';
+
+import '../config/colors.dart';
 import '../models/ticket_model.dart';
+import '../services/firebase_service.dart';
 
 class BookingController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
@@ -21,7 +23,7 @@ class BookingController extends GetxController {
       var result = await _firebaseService.getUserTickets();
       myTickets.assignAll(result);
     } catch (e) {
-      print('Biletleri yüklerken hata: $e');
+      debugPrint('Biletleri yüklerken hata: $e');
     } finally {
       isLoading.value = false;
     }
@@ -74,14 +76,14 @@ class BookingController extends GetxController {
       Get.snackbar(
         "Başarılı",
         "Bilet başarıyla satın alındı! Token gömülü QR kodunuz Turlarım sekmesinde.",
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.success,
         colorText: Colors.white,
       );
     } catch (e) {
       Get.snackbar(
         "Hata",
         "Satın alma işlemi başarısız: $e",
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {
@@ -104,7 +106,7 @@ class BookingController extends GetxController {
         Get.snackbar(
           "Başarılı",
           "İade işlemleri başlatıldı. Paranız hesabınıza iade edilecektir.",
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.success,
           colorText: Colors.white,
         );
       }
@@ -112,7 +114,7 @@ class BookingController extends GetxController {
       Get.snackbar(
         "Hata",
         "İptal işlemi başarısız: $e",
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {

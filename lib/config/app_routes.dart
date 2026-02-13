@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/city/city_choice_screen.dart';
 import '../screens/my_tours/my_tours_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/qr/my_qr_screen.dart';
-import '../screens/tour/tour_list_screen.dart';
-import '../screens/tour/tour_detail_screen.dart';
-import '../screens/test/test_tour_screen.dart';
-import '../screens/tour_manager/tour_manager_home_screen.dart';
-import '../screens/tour_manager/tour_manager_announcements_screen.dart';
 import '../screens/qr/qr_scanner_screen.dart';
+import '../screens/test/test_tour_screen.dart';
+import '../screens/tour/tour_detail_screen.dart';
+import '../screens/tour/tour_list_screen.dart';
+import '../screens/tour_manager/tour_manager_announcements_screen.dart';
 import '../screens/tour_manager/tour_manager_chat_screen.dart';
 import '../screens/tour_manager/tour_manager_customers_screen.dart';
+import '../screens/tour_manager/tour_manager_home_screen.dart';
 
+/// Uygulama içi rota sabitleri.
 abstract class AppRoutes {
   static const String login = '/login';
   static const String signup = '/signup';
@@ -32,7 +34,7 @@ abstract class AppRoutes {
   static const String qrScanner = '/qr-scanner';
   static const String tourManagerChat = '/tour-manager-chat';
   static const String tourManagerCustomers = '/tour-manager-customers';
-  static const String testTour = '/test-tour'; // 🧪 Test - sonra silinecek
+  static const String testTour = '/test-tour';
 }
 
 class AppPages {
@@ -109,7 +111,7 @@ class AppPages {
       page: () => const TourManagerCustomersScreen(),
       transition: Transition.rightToLeft,
     ),
-    // 🧪 Test route - sonra silinecek
+    // Test
     GetPage(
       name: AppRoutes.testTour,
       page: () => const TestTourScreen(),

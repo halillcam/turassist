@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:turassist/controllers/tour_controller.dart';
+
 import '../services/firebase_service.dart';
+import 'tour_controller.dart';
 
 class CityController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
@@ -31,7 +33,7 @@ class CityController extends GetxController {
         }
       }
     } catch (e) {
-      print('Kayıtlı şehir yüklenirken hata: $e');
+      debugPrint('Kayıtlı şehir yüklenirken hata: $e');
     }
   }
 
@@ -48,7 +50,7 @@ class CityController extends GetxController {
       var result = await _firebaseService.getAllCities();
       cities.assignAll(result);
     } catch (e) {
-      print('Şehirleri yüklerken hata: $e');
+      debugPrint('Şehirleri yüklerken hata: $e');
     } finally {
       isLoading.value = false;
     }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
+import '../config/colors.dart';
 import '../services/firebase_service.dart';
 
 class GuideController extends GetxController {
@@ -20,7 +22,7 @@ class GuideController extends GetxController {
       Get.snackbar(
         "Hata",
         "Katılımcıları yüklerken hata: $e",
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {
@@ -40,14 +42,14 @@ class GuideController extends GetxController {
         Get.snackbar(
           "Başarılı",
           "Bilet onaylandı, yolcu içeri alınabilir.",
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.success,
           colorText: Colors.white,
         );
       } else {
         Get.snackbar(
           "Hata",
           "Bilet geçersiz veya daha önce okutulmuş.",
-          backgroundColor: Colors.orange,
+          backgroundColor: AppColors.warning,
           colorText: Colors.white,
         );
       }
@@ -55,7 +57,7 @@ class GuideController extends GetxController {
       Get.snackbar(
         "Hata",
         "Bilet okutma başarısız: $e",
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {
@@ -71,14 +73,14 @@ class GuideController extends GetxController {
       Get.snackbar(
         "Başarılı",
         "Bildirim katılımcılara gönderildi.",
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.success,
         colorText: Colors.white,
       );
     } catch (e) {
       Get.snackbar(
         "Hata",
         "Bildirim gönderme başarısız: $e",
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {
@@ -95,7 +97,7 @@ class GuideController extends GetxController {
       Get.snackbar(
         "Başarılı",
         "Tur bitirme talebi şirkete gönderildi. Onay bekleniyor...",
-        backgroundColor: Colors.green,
+        backgroundColor: AppColors.success,
         colorText: Colors.white,
       );
 
@@ -107,7 +109,7 @@ class GuideController extends GetxController {
       Get.snackbar(
         "Hata",
         "Turu bitirme başarısız: $e",
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
     } finally {

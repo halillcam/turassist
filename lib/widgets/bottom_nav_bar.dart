@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:turassist/config/colors.dart';
+
+import '../config/colors.dart';
 import 'nav_item.dart';
 
 class BottomNavBar extends StatelessWidget {
@@ -7,8 +8,12 @@ class BottomNavBar extends StatelessWidget {
   final Function(int) onItemTapped;
   final Map<int, String?>? badges;
 
-  const BottomNavBar({Key? key, required this.activeIndex, required this.onItemTapped, this.badges})
-    : super(key: key);
+  const BottomNavBar({
+    super.key,
+    required this.activeIndex,
+    required this.onItemTapped,
+    this.badges,
+  });
 
   @override
   Widget build(BuildContext context) {

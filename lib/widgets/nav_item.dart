@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:turassist/config/colors.dart';
+import '../config/colors.dart';
 
 class NavItem extends StatelessWidget {
   final IconData icon;
@@ -9,13 +9,13 @@ class NavItem extends StatelessWidget {
   final String? badge;
 
   const NavItem({
-    Key? key,
+    super.key,
     required this.icon,
     required this.label,
     required this.isActive,
     required this.onTap,
     this.badge,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

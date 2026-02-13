@@ -1,15 +1,15 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
-import 'package:get/get.dart';
-import 'package:turassist/controllers/login_controller.dart';
 import 'dart:ui';
-import 'package:turassist/widgets/index.dart';
-import 'package:turassist/widgets/signup_header.dart';
-import 'package:turassist/widgets/terms_checkbox.dart';
-import 'package:turassist/widgets/social_buttons_row.dart';
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../config/colors.dart';
+import '../../controllers/login_controller.dart';
+import '../../widgets/index.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({Key? key}) : super(key: key);
+  const SignupScreen({super.key});
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -116,8 +116,8 @@ class _SignupScreenState extends State<SignupScreen> {
                               // Password Field
                               Obx(
                                 () => AuthInputField(
-                                  label: 'Şifre',
-                                  hint: 'Şifrenizi oluşturun',
+                                  label: 'Åifre',
+                                  hint: 'Åifrenizi oluşturun',
                                   prefixIcon: Icons.lock,
                                   suffixIcon: _loginController.obscureText.value
                                       ? Icons.visibility_off
@@ -129,10 +129,10 @@ class _SignupScreenState extends State<SignupScreen> {
                                   },
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Şifre gerekli';
+                                      return 'Åifre gerekli';
                                     }
                                     if (value.length < 6) {
-                                      return 'Şifre en az 6 karakter olmalı';
+                                      return 'Åifre en az 6 karakter olmalı';
                                     }
                                     return null;
                                   },
@@ -177,7 +177,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                       TextSpan(
                                         text: 'Giriş Yap',
                                         style: TextStyle(
-                                          color: Color(0xFF137fec),
+                                          color: AppColors.primary,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 13,
                                         ),
@@ -225,9 +225,9 @@ class _SignupScreenState extends State<SignupScreen> {
         () => ElevatedButton(
           onPressed: _loginController.isLoading.value ? null : _handleSignup,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF137fec),
-            disabledBackgroundColor: Color(0xFF137fec).withOpacity(0.5),
-            shadowColor: Color(0xFF137fec).withOpacity(0.4),
+            backgroundColor: AppColors.primary,
+            disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+            shadowColor: AppColors.primary.withOpacity(0.4),
             elevation: 12,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -255,7 +255,7 @@ class _SignupScreenState extends State<SignupScreen> {
         'Hata',
         'Lütfen şartları kabul edin',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         colorText: Colors.white,
       );
       return;
@@ -263,7 +263,11 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (_formKey.currentState!.validate()) {
       // Signup logic
-      Get.snackbar('Başarı', 'Hesap oluşturulmaya başlandı', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'Başarı',
+        'Hesap oluşturulmaya başlandı',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 

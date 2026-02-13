@@ -1,4 +1,4 @@
-import 'package:turassist/config/city_image_urls.dart';
+import '../config/city_image_urls.dart';
 
 enum CityRegion { marmara, karadeniz, ege, icAnadolu, akdeniz, doguAnadolu, guneydoguAnadolu }
 

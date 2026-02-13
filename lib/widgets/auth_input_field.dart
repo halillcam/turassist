@@ -11,7 +11,7 @@ class AuthInputField extends StatelessWidget {
   final VoidCallback? onSuffixIconPressed;
 
   const AuthInputField({
-    Key? key,
+    super.key,
     required this.label,
     required this.hint,
     required this.prefixIcon,
@@ -20,7 +20,7 @@ class AuthInputField extends StatelessWidget {
     required this.controller,
     this.validator,
     this.onSuffixIconPressed,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

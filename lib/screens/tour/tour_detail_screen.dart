@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:turassist/config/colors.dart';
-import 'package:turassist/models/tour_model.dart';
-import 'package:turassist/models/tour_program_model.dart';
-import 'package:turassist/services/firebase_service.dart';
-import 'package:turassist/widgets/included_item.dart';
+
+import '../../config/colors.dart';
+import '../../models/tour_model.dart';
+import '../../models/tour_program_model.dart';
+import '../../services/firebase_service.dart';
 
 class TourDetailScreen extends StatefulWidget {
   final TourModel tour;
@@ -57,9 +57,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
                 // Tur Hakkında
                 _buildAboutSection(tour),
-
-                // Neler dahil
-                // _buildIncludedSection(),
 
                 // Tur Programı
                 _buildProgramSection(),
@@ -414,7 +411,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 ),
               )
             else
-              ..._programDays.map((day) => _buildDayItem(day)),
+              ..._programDays.map(_buildDayItem),
           ],
         ),
       ),
@@ -507,40 +504,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildIncludedSection() {
-    return Transform.translate(
-      offset: const Offset(0, -8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            const Text(
-              'Neler dahil',
-              style: TextStyle(color: AppColors.white, fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 3.5,
-              children: const [
-                IncludedItem(icon: Icons.check_circle, label: 'Profesyonel rehber'),
-                IncludedItem(icon: Icons.restaurant, label: 'Geleneksel öğle yemeği'),
-                IncludedItem(icon: Icons.confirmation_number, label: 'Giriş ücretleri'),
-                IncludedItem(icon: Icons.directions_bus, label: 'Otelden alma'),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
