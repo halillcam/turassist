@@ -9,10 +9,23 @@
       "client_info": {
         "mobilesdk_app_id": "1:138121353976:android:f633c63a1143590f8f790d",
         "android_client_info": {
-          "package_name": "com.example.turassist"
+          "package_name": "com.natanzdev.turassist"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "138121353976-ml6slp6ag3ss8p9heoi72j8hppptgtvt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.natanzdev.turassist",
+            "certificate_hash": "db0dacaf00dfb5af5acdd1ec096cc2a6ace97169"
+          }
+        },
+        {
+          "client_id": "138121353976-speesd4fohoh0i86lkqce630sqrjqilj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAE9TEDgudXAWBnrNR_c3lrZdnNRrRZpRA"
@@ -20,7 +33,63 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "138121353976-speesd4fohoh0i86lkqce630sqrjqilj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "138121353976-65a82pi05je8pa7laij6vp5qme8892dr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.natanzdev.turassist"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:138121353976:android:a01d398b990726228f790d",
+        "android_client_info": {
+          "package_name": "com.natanzdev.turassist"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "138121353976-778rhpiqutpchele48e30nkp9tbru44l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.natanzdev.turassist",
+            "certificate_hash": "db0dacaf00dfb5af5acdd1ec096cc2a6ace97169"
+          }
+        },
+        {
+          "client_id": "138121353976-speesd4fohoh0i86lkqce630sqrjqilj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAE9TEDgudXAWBnrNR_c3lrZdnNRrRZpRA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "138121353976-speesd4fohoh0i86lkqce630sqrjqilj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "138121353976-65a82pi05je8pa7laij6vp5qme8892dr.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.natanzdev.turassist"
+              }
+            }
+          ]
         }
       }
     }
