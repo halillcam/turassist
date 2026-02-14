@@ -89,10 +89,7 @@ class TourManagerHomeScreen extends StatelessWidget {
                     letterSpacing: -0.3,
                   ),
                 ),
-                Text(
-                  'Yönetici Portalı',
-                  style: TextStyle(color: AppColors.slate400, fontSize: 12),
-                ),
+                Text('Yönetici Portalı', style: TextStyle(color: AppColors.slate400, fontSize: 12)),
               ],
             ),
           ),
@@ -152,7 +149,7 @@ class TourManagerHomeScreen extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _statCard(
-            'GİRİÅ YAPILDI',
+            'GİRİŞ YAPILDI',
             '18',
             '%75 Tamamlandı',
             AppColors.primary,
@@ -348,7 +345,11 @@ class TourManagerHomeScreen extends StatelessWidget {
           subtitle: 'Gruptan 3 okunmamış mesaj',
           showDot: true,
           onTap: () {
-            Get.toNamed('/tour-manager-chat');
+            // TODO: Dinamik tourId/tourTitle kullanılacak
+            Get.toNamed(
+              '/tour-manager-chat',
+              arguments: {'tourId': 'test_tour_id', 'tourTitle': 'Roma Gün Batımı Yürüyüşü'},
+            );
           },
         ),
       ],

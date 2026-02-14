@@ -139,12 +139,15 @@ class FirebaseService {
   // Bilet oluşturma [cite: 15, 28]
   Future<String> createTicket(TicketModel ticket) async {
     try {
+      debugPrint('createTicket: userId=${ticket.userId}, tourId=${ticket.tourId}');
+      debugPrint('createTicket: toJson=${ticket.toJson()}');
       final docRef = _firestore.collection('tickets').doc();
       await docRef.set(ticket.toJson());
+      debugPrint('createTicket: BAŞARILI → docId=${docRef.id}');
       return docRef.id;
     } catch (e) {
-      debugPrint('Error creating ticket: $e');
-      throw Exception("Bilet oluşturma başarısız");
+      debugPrint('createTicket: HATA → $e');
+      throw Exception("Bilet oluşturma başarısız: $e");
     }
   }
 
@@ -167,17 +170,29 @@ class FirebaseService {
   Future<List<TicketModel>> getUserTickets() async {
     try {
       final userId = _auth.currentUser?.uid ?? '';
-      if (userId.isEmpty) throw Exception("Kullanıcı giriş yapmamış");
+      debugPrint('getUserTickets: userId=$userId');
+      if (userId.isEmpty) {
+        debugPrint('getUserTickets: HATA — userId boş!');
+        throw Exception("Kullanıcı giriş yapmamış");
+      }
 
+      debugPrint('getUserTickets: Firestore sorgusu çalıştırılıyor...');
       final snapshot = await _firestore
           .collection('tickets')
           .where('userId', isEqualTo: userId)
-          .orderBy('purchaseDate', descending: true)
           .get();
 
-      return snapshot.docs.map(TicketModel.fromFirestore).toList();
+      debugPrint('getUserTickets: ${snapshot.docs.length} belge bulundu');
+      for (final doc in snapshot.docs) {
+        debugPrint('  DOC: id=${doc.id}, data=${doc.data()}');
+      }
+
+      final tickets = snapshot.docs.map(TicketModel.fromFirestore).toList();
+      // Composite index gerekmeden bellekte sırala
+      tickets.sort((a, b) => b.purchaseDate.compareTo(a.purchaseDate));
+      return tickets;
     } catch (e) {
-      debugPrint('Error fetching user tickets: $e');
+      debugPrint('getUserTickets: HATA → $e');
       return [];
     }
   }
@@ -237,15 +252,23 @@ class FirebaseService {
   // ==================== CHAT & ANNOUNCEMENT ====================
   // Mesaj gönderimi (Sadece tourId ve ChatModel alır)
   Future<void> sendChatMessage(String tourId, ChatModel message) async {
-    try {
-      await _firestore.collection('tours').doc(tourId).collection('messages').add(message.toJson());
-    } catch (e) {
-      debugPrint('Chat Error: $e');
-    }
+    debugPrint('═══ SEND_MSG: Başladı ═══');
+    debugPrint('SEND_MSG: tourId=$tourId');
+    debugPrint('SEND_MSG: senderId=${message.senderId}');
+    debugPrint('SEND_MSG: senderName=${message.senderName}');
+    debugPrint('SEND_MSG: text=${message.text}');
+
+    final ref = _firestore.collection('tours').doc(tourId).collection('messages');
+    debugPrint('SEND_MSG: Yazılıyor → ${ref.path}');
+
+    final docRef = await ref.add(message.toJson());
+    debugPrint('SEND_MSG: BAŞARILI ✓ docId=${docRef.id}');
+    debugPrint('═══ SEND_MSG: Tamamlandı ═══');
   }
 
   // Mesajları dinle (Stream)
   Stream<List<ChatModel>> getChatMessages(String tourId) {
+    debugPrint('getChatMessages: Stream başlatılıyor → tours/$tourId/messages');
     return _firestore
         .collection('tours')
         .doc(tourId)
@@ -253,6 +276,7 @@ class FirebaseService {
         .orderBy('timestamp', descending: false)
         .snapshots()
         .map((snapshot) {
+          debugPrint('getChatMessages: snapshot → ${snapshot.docs.length} mesaj');
           return snapshot.docs.map(ChatModel.fromFirestore).toList();
         });
   }
@@ -451,12 +475,6 @@ class FirebaseService {
       throw Exception(
         "Admin hesaplar web panelinde kullanılır. Lütfen web admin panelini ziyaret edin.",
       );
-    }
-
-    final authorized = await isAuthorizedForCompany(userId, companyId);
-    if (!authorized) {
-      await _auth.signOut();
-      throw Exception("Bu şirket paneline giriş yetkiniz yok.");
     }
 
     return user;

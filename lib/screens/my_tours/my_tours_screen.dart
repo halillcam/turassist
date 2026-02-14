@@ -50,25 +50,15 @@ class MyToursScreen extends StatelessWidget {
         }),
       ),
       bottomNavigationBar: BottomNavBar(activeIndex: 1, onItemTapped: _onItemTapped),
-      // ğŸ§ª Test butonu
       floatingActionButton: Obx(() {
+        if (!controller.hasCheckedIn) return const SizedBox.shrink();
         return FloatingActionButton.extended(
-          onPressed: () {
-            if (controller.hasCheckedIn) {
-              controller.resetCheckIn();
-            } else {
-              controller.simulateCheckIn();
-            }
-          },
-          backgroundColor: controller.hasCheckedIn ? AppColors.slate700 : AppColors.primary,
-          icon: Icon(
-            controller.hasCheckedIn ? Icons.undo : Icons.qr_code_scanner,
-            color: Colors.white,
-            size: 20,
-          ),
-          label: Text(
-            controller.hasCheckedIn ? 'Listeye Dön' : 'QR Tara (Test)',
-            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+          onPressed: controller.backToTicketList,
+          backgroundColor: AppColors.slate700,
+          icon: const Icon(Icons.undo, color: Colors.white, size: 20),
+          label: const Text(
+            'Listeye Dön',
+            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
           ),
         );
       }),
@@ -211,46 +201,74 @@ class _TicketListView extends StatelessWidget {
     final dateStr = DateFormat('dd MMMM yyyy', 'tr_TR').format(ticket.purchaseDate);
     final tourTitle = tour?.title ?? 'Tur';
     final companyName = tour?.guideName ?? '—';
+    final isActive = ticket.status == 'active';
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.slate800),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tourTitle,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    height: 1.3,
+    return GestureDetector(
+      onTap: isActive ? () => controller.checkInTicket(ticket) : null,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardDark,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isActive ? AppColors.slate700 : AppColors.slate800),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tourTitle,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      height: 1.3,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  companyName,
-                  style: const TextStyle(
-                    color: AppColors.slate400,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: 4),
+                  Text(
+                    companyName,
+                    style: const TextStyle(
+                      color: AppColors.slate400,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(dateStr, style: const TextStyle(color: AppColors.slate300, fontSize: 12)),
-              ],
+                  const SizedBox(height: 4),
+                  Text(dateStr, style: const TextStyle(color: AppColors.slate300, fontSize: 12)),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          const Icon(Icons.qr_code_2, color: AppColors.primary, size: 40),
-        ],
+            const SizedBox(width: 12),
+            if (isActive)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.success,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.qr_code_scanner, color: Colors.white, size: 18),
+                    SizedBox(width: 6),
+                    Text(
+                      'Giriş Yap',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              const Icon(Icons.qr_code_2, color: AppColors.slate500, size: 40),
+          ],
+        ),
       ),
     );
   }
@@ -265,39 +283,46 @@ class _ActiveTourDetailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tour = controller.activeTour.value!;
-    final program = controller.programDays;
+    return Obx(() {
+      final tour = controller.activeTour.value;
+      if (tour == null) {
+        return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      }
+      final program = controller.programDays;
 
-    return Column(
-      children: [
-        _buildAppBar(),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: controller.refresh,
-            color: AppColors.primary,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
-                  _buildStatusBadge(),
-                  const SizedBox(height: 12),
-                  _buildTourTitle(tour.title),
-                  const SizedBox(height: 24),
-                  _buildVehicleCard(tour.busInfo.plate),
-                  const SizedBox(height: 12),
-                  _buildGuideCard(tour.guideName ?? 'Rehber', tour.busInfo.phoneNumber),
-                  const SizedBox(height: 28),
-                  if (program.isNotEmpty) _buildProgramSection(program, tour.createdAt),
-                ],
+      return Column(
+        children: [
+          _buildAppBar(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: controller.refresh,
+              color: AppColors.primary,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildStatusBadge(),
+                    const SizedBox(height: 12),
+                    _buildTourTitle(tour.title),
+                    const SizedBox(height: 24),
+                    _buildVehicleCard(tour.busInfo.plate),
+                    const SizedBox(height: 12),
+                    _buildGuideCard(tour.guideName ?? 'Rehber', tour.busInfo.phoneNumber),
+                    const SizedBox(height: 12),
+                    _buildChatCard(tour.id, tour.title),
+                    const SizedBox(height: 28),
+                    if (program.isNotEmpty) _buildProgramSection(program, tour.createdAt),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
+    });
   }
 
   Widget _buildAppBar() {
@@ -490,6 +515,76 @@ class _ActiveTourDetailView extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Tur sohbetine erişim kartı.
+  Widget _buildChatCard(String tourId, String tourTitle) {
+    return GestureDetector(
+      onTap: () =>
+          Get.toNamed(AppRoutes.chat, arguments: {'tourId': tourId, 'tourTitle': tourTitle}),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardDark,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.slate800),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.chat_bubble_outline, color: AppColors.success, size: 24),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tur Sohbeti',
+                    style: TextStyle(
+                      color: AppColors.slate400,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Grup sohbetine katıl',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.success,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.success.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+            ),
+          ],
+        ),
       ),
     );
   }

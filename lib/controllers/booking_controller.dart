@@ -42,12 +42,21 @@ class BookingController extends GetxController {
     try {
       isLoading.value = true;
 
-      // 1. İyzico 3D Secure ödeme akışını başlat
-      // Bu, native platform channel veya REST API aracılığıyla olabilir
-      // Başarılı ödemenin ardından QR kod oluştur
-
-      // 2. Ödeme başarılı ise bilet oluştur
       final userId = _firebaseService.getCurrentUserId();
+      debugPrint('═══ PURCHASE: Başladı ═══');
+      debugPrint('PURCHASE: userId=$userId');
+      debugPrint('PURCHASE: tourId=$tourId');
+
+      if (userId.isEmpty) {
+        debugPrint('PURCHASE: HATA — userId boş! Kullanıcı giriş yapmamış.');
+        Get.snackbar(
+          'Hata',
+          'Giriş yapılmamış',
+          backgroundColor: AppColors.error,
+          colorText: Colors.white,
+        );
+        return;
+      }
 
       TicketModel newTicket = TicketModel(
         id: '',
@@ -65,24 +74,28 @@ class BookingController extends GetxController {
         scannedAt: null,
       );
 
+      debugPrint('PURCHASE: Bilet oluşturuluyor...');
       String ticketId = await _firebaseService.createTicket(newTicket);
+      debugPrint('PURCHASE: Bilet oluşturuldu → ticketId=$ticketId');
 
-      // 3. Başarılı ödemenin ardından unique QR token gömülü QR kod oluştur [cite: 18, 32]
       String qrToken = await _firebaseService.generateQRToken(ticketId);
       await _firebaseService.updateTicketQRToken(ticketId, qrToken);
+      debugPrint('PURCHASE: QR token kaydedildi ✓');
 
       myTickets.add(newTicket);
 
       Get.snackbar(
-        "Başarılı",
-        "Bilet başarıyla satın alındı! Token gömülü QR kodunuz Turlarım sekmesinde.",
+        'Başarılı',
+        'Bilet başarıyla satın alındı!',
         backgroundColor: AppColors.success,
         colorText: Colors.white,
       );
+      debugPrint('═══ PURCHASE: Tamamlandı ═══');
     } catch (e) {
+      debugPrint('PURCHASE: HATA → $e');
       Get.snackbar(
-        "Hata",
-        "Satın alma işlemi başarısız: $e",
+        'Hata',
+        'Satın alma işlemi başarısız: $e',
         backgroundColor: AppColors.error,
         colorText: Colors.white,
       );

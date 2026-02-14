@@ -123,11 +123,12 @@ class _CityChoiceScreenState extends State<CityChoiceScreen> with TickerProvider
           child: ElevatedButton(
             onPressed: _selectedCityName.value != null
                 ? () {
-                    // Seçilen şehri CityController'a gönder, o da TourController'ı tetikler
+                    // Seçilen şehri CityController'a gönder ve locale kaydet
                     final cityController = Get.put(CityController());
                     Get.put(TourController()); // TourController'ı önceden register et
                     cityController.updateCity(_selectedCityName.value!);
-                    Get.toNamed(AppRoutes.tourList);
+                    // Şehir seçildikten sonra tur listesine yönlendir (geri dönüş yok)
+                    Get.offAllNamed(AppRoutes.tourList);
                   }
                 : null,
             style: ElevatedButton.styleFrom(

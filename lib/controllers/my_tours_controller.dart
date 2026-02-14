@@ -28,9 +28,6 @@ class MyToursController extends GetxController {
   final Rxn<TourModel> activeTour = Rxn<TourModel>();
   final RxList<TourProgramDay> programDays = <TourProgramDay>[].obs;
 
-  // ─── Test Modu ───
-  final RxBool isTestCheckedIn = false.obs;
-
   @override
   void onInit() {
     super.onInit();
@@ -43,7 +40,13 @@ class MyToursController extends GetxController {
       isLoading.value = true;
       errorMessage.value = '';
 
+      debugPrint('═══ LOAD_DATA: Başladı ═══');
+
       final userTickets = await _firebaseService.getUserTickets();
+      debugPrint('LOAD_DATA: ${userTickets.length} bilet bulundu');
+      for (final t in userTickets) {
+        debugPrint('  BILET: id=${t.id}, tourId=${t.tourId}, status=${t.status}');
+      }
       tickets.assignAll(userTickets);
 
       // checked_in olan bilet varsa aktif tur olarak yükle
@@ -59,12 +62,17 @@ class MyToursController extends GetxController {
           final tour = await _firebaseService.getTourById(ticket.tourId);
           if (tour != null) {
             ticketTours[ticket.tourId] = tour;
+            debugPrint('LOAD_DATA: Tur cache\'lendi → ${tour.title}');
+          } else {
+            debugPrint('LOAD_DATA: Tur bulunamadı → ${ticket.tourId}');
           }
         }
       }
+
+      debugPrint('═══ LOAD_DATA: Tamamlandı ═══');
     } catch (e) {
       errorMessage.value = 'Veriler yüklenirken hata oluştu.';
-      debugPrint('MyToursController error: $e');
+      debugPrint('LOAD_DATA: HATA → $e');
     } finally {
       isLoading.value = false;
     }
@@ -80,7 +88,7 @@ class MyToursController extends GetxController {
   }
 
   /// Aktif (checked_in) bilet var mı?
-  bool get hasCheckedIn => checkedInTicket.value != null || isTestCheckedIn.value;
+  bool get hasCheckedIn => checkedInTicket.value != null;
 
   /// Yaklaşan turlar: 'active' durumundaki biletler.
   List<TicketModel> get upcomingTickets => tickets.where((t) => t.status == 'active').toList();
@@ -89,59 +97,27 @@ class MyToursController extends GetxController {
   List<TicketModel> get pastTickets =>
       tickets.where((t) => t.status == 'completed' || t.status == 'cancelled').toList();
 
-  /// Test: QR taranmış gibi simüle eder.
-  Future<void> simulateCheckIn() async {
-    isTestCheckedIn.value = true;
-
-    if (tickets.isNotEmpty) {
-      final testTicket = upcomingTickets.isNotEmpty ? upcomingTickets.first : tickets.first;
-      checkedInTicket.value = testTicket;
-      await _loadActiveTourDetail(testTicket.tourId);
-    } else {
-      final tours = await _firebaseService.getActiveTours();
-      if (tours.isNotEmpty) {
-        for (final t in tours) {
-          final program = await _firebaseService.getTourProgram(t.id);
-          if (program.isNotEmpty) {
-            activeTour.value = t;
-            programDays.assignAll(program);
-            break;
-          }
-        }
-        activeTour.value ??= tours.first;
-      }
-    }
+  /// Bilet için QR okutma simülasyonu.
+  ///
+  /// Biletin turunu aktif tur olarak yükler ve detay görünümüne geçer.
+  Future<void> checkInTicket(TicketModel ticket) async {
+    checkedInTicket.value = ticket;
+    await _loadActiveTourDetail(ticket.tourId);
 
     Get.snackbar(
-      'Test Modu',
-      'QR taranmış gibi simüle edildi.',
+      'QR Okutuldu',
+      'Tura giriş yapıldı.',
       snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppColors.primary,
+      backgroundColor: AppColors.success,
       colorText: Colors.white,
     );
   }
 
-  /// Test: Simülasyonu geri alır.
-  void resetCheckIn() {
-    isTestCheckedIn.value = false;
+  /// Aktif tur görünümünden bilet listesine geri döner.
+  void backToTicketList() {
     checkedInTicket.value = null;
     activeTour.value = null;
     programDays.clear();
-
-    // Gerçek checked_in bilet varsa geri yükle
-    final realCheckedIn = tickets.where((t) => t.status == 'checked_in').toList();
-    if (realCheckedIn.isNotEmpty) {
-      checkedInTicket.value = realCheckedIn.first;
-      _loadActiveTourDetail(realCheckedIn.first.tourId);
-    }
-
-    Get.snackbar(
-      'Test Modu',
-      'Bilet listesine geri dönüldü.',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppColors.slate700,
-      colorText: Colors.white,
-    );
   }
 
   /// Verileri yeniden yükler.

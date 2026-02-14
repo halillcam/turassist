@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../screens/auth/email_verification_screen.dart';
+import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../screens/chat/chat_screen.dart';
 import '../screens/city/city_choice_screen.dart';
 import '../screens/my_tours/my_tours_screen.dart';
 import '../screens/profile/profile_screen.dart';
@@ -21,6 +24,7 @@ abstract class AppRoutes {
   static const String login = '/login';
   static const String signup = '/signup';
   static const String forgotPassword = '/forgot-password';
+  static const String emailVerification = '/email-verification';
   static const String guideLogin = '/guide-login';
   static const String citySelection = '/city-selection';
   static const String guideDashboard = '/guide-dashboard';
@@ -29,6 +33,7 @@ abstract class AppRoutes {
   static const String myTours = '/my-tours';
   static const String myQrs = '/my-qrs';
   static const String profile = '/profile';
+  static const String chat = '/chat';
   static const String tourManagerHome = '/tour-manager-home';
   static const String tourManagerAnnouncements = '/tour-manager-announcements';
   static const String qrScanner = '/qr-scanner';
@@ -47,7 +52,12 @@ class AppPages {
     ),
     GetPage(
       name: AppRoutes.forgotPassword,
-      page: () => Scaffold(body: Center(child: Text('Forgot Password Screen - Todo'))),
+      page: () => const ForgotPasswordScreen(),
+      transition: Transition.fadeIn,
+    ),
+    GetPage(
+      name: AppRoutes.emailVerification,
+      page: () => const EmailVerificationScreen(),
       transition: Transition.fadeIn,
     ),
     GetPage(
@@ -109,6 +119,11 @@ class AppPages {
     GetPage(
       name: AppRoutes.tourManagerCustomers,
       page: () => const TourManagerCustomersScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.chat,
+      page: () => const ChatScreen(),
       transition: Transition.rightToLeft,
     ),
     // Test

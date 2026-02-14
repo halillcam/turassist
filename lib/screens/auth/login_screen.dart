@@ -55,7 +55,26 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Column(
                   children: [
-                    const SizedBox(height: 40),
+                    // Geri butonu (profil üzerinden geldiyse)
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: GestureDetector(
+                        onTap: () => Get.back(),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
                     // Logo and Title
                     _buildHeader(),
@@ -355,12 +374,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // Google Sign In Fonksiyonu
   void _handleGoogleSignIn() {
-    // Google Sign In implementasyonu
-    Get.snackbar(
-      'Uyarı',
-      'Google Sign In henüz entegre edilmemiştir.',
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    _loginController.signInWithGoogle();
   }
 
   // ─── Test Butonları ───

@@ -116,8 +116,8 @@ class _SignupScreenState extends State<SignupScreen> {
                               // Password Field
                               Obx(
                                 () => AuthInputField(
-                                  label: 'Åifre',
-                                  hint: 'Åifrenizi oluşturun',
+                                  label: 'Şifre',
+                                  hint: 'Şifrenizi oluşturun',
                                   prefixIcon: Icons.lock,
                                   suffixIcon: _loginController.obscureText.value
                                       ? Icons.visibility_off
@@ -129,10 +129,10 @@ class _SignupScreenState extends State<SignupScreen> {
                                   },
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Åifre gerekli';
+                                      return 'Şifre gerekli';
                                     }
                                     if (value.length < 6) {
-                                      return 'Åifre en az 6 karakter olmalı';
+                                      return 'Şifre en az 6 karakter olmalı';
                                     }
                                     return null;
                                   },
@@ -262,20 +262,22 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     if (_formKey.currentState!.validate()) {
-      // Signup logic
-      Get.snackbar(
-        'Başarı',
-        'Hesap oluşturulmaya başlandı',
-        snackPosition: SnackPosition.BOTTOM,
+      // İsim ve soyisim ayırma
+      final fullName = _nameController.text.trim();
+      final parts = fullName.split(RegExp(r'\s+'));
+      final name = parts.first;
+      final surname = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+
+      _loginController.register(
+        _emailController.text.trim(),
+        _passwordController.text,
+        name,
+        surname,
       );
     }
   }
 
   void _handleGoogleSignup() {
-    Get.snackbar(
-      'Uyarı',
-      'Google ile Kayıt henüz entegre edilmemiştir.',
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    _loginController.signInWithGoogle();
   }
 }

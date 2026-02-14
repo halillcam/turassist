@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -5,14 +6,28 @@ import '../config/app_routes.dart';
 import '../config/colors.dart';
 import '../models/user_model.dart';
 import '../services/firebase_service.dart';
+import '../services/google_auth_service.dart';
 
 /// Profil ekranı için kullanıcı bilgilerini yöneten controller.
 class ProfileController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
+  final GoogleAuthService _googleAuthService = GoogleAuthService();
 
   final Rx<UserModel?> user = Rx<UserModel?>(null);
   final RxBool isLoading = true.obs;
   final RxBool notificationsEnabled = true.obs;
+
+  /// Kullanıcı giriş yapmış mı?
+  bool get isLoggedIn => FirebaseAuth.instance.currentUser != null;
+
+  /// Kullanıcı sadece Google ile mi giriş yapmış? (şifre değiştirme gizlenir)
+  bool get isGoogleOnlyUser {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    final isGoogle = user.providerData.any((p) => p.providerId == 'google.com');
+    final hasPassword = user.providerData.any((p) => p.providerId == 'password');
+    return isGoogle && !hasPassword;
+  }
 
   @override
   void onInit() {
@@ -23,7 +38,11 @@ class ProfileController extends GetxController {
   /// Firestore'dan kullanıcı profilini yükler.
   Future<void> loadUserProfile() async {
     isLoading.value = true;
-    user.value = await _firebaseService.getUserProfile();
+    if (isLoggedIn) {
+      user.value = await _firebaseService.getUserProfile();
+    } else {
+      user.value = null;
+    }
     isLoading.value = false;
   }
 
@@ -38,11 +57,12 @@ class ProfileController extends GetxController {
     return parts.first[0].toUpperCase();
   }
 
-  /// Kullanıcıyı çıkış yaptırır ve giriş ekranına yönlendirir.
+  /// Kullanıcıyı çıkış yaptırır ve tur listesine geri döner.
   Future<void> logout() async {
     try {
-      await _firebaseService.logout();
-      Get.offAllNamed(AppRoutes.login);
+      await _googleAuthService.signOut();
+      user.value = null;
+      Get.offAllNamed(AppRoutes.tourList);
     } catch (e) {
       Get.snackbar(
         'Hata',

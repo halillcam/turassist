@@ -1,8 +1,18 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../config/colors.dart';
+import '../../controllers/chat_controller.dart';
 
+/// Tur sorumlusu (rehber) tarafı sohbet ekranı.
+///
+/// Tur katılımcıları ile grup sohbeti sağlar. Rehberin mesajlarına
+/// "REHBER" rozeti eklenir.
+///
+/// Gerekli arguments:
+/// - `tourId`: Sohbetin bağlı olduğu tur ID'si
+/// - `tourTitle`: AppBar'da gösterilecek tur başlığı
 class TourManagerChatScreen extends StatefulWidget {
   const TourManagerChatScreen({super.key});
 
@@ -11,23 +21,46 @@ class TourManagerChatScreen extends StatefulWidget {
 }
 
 class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
+  // ─── Controller & State ───
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  late final ChatController _chatController;
 
-  // Şablon mesajlar
-  final List<_ChatMessage> _messages = [
-    _ChatMessage(sender: 'Ahmet Yılmaz', text: '', time: '14:22', isMe: false),
-    _ChatMessage(sender: 'Siz (Mert Demir)', text: '', time: '14:25', isMe: true),
-    _ChatMessage(sender: 'Canan Özkan', text: '', time: '14:30', isMe: false, badge: 'REHBER'),
-    _ChatMessage(sender: 'Zeynep Kaya', text: '', time: '14:32', isMe: false),
-  ];
+  late final String _tourId;
+  late final String _tourTitle;
+
+  /// Rehberin Firebase Auth bilgileri.
+  String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
+  String get _currentUserName => FirebaseAuth.instance.currentUser?.displayName ?? 'Rehber';
+
+  // ─── Lifecycle ───
+
+  @override
+  void initState() {
+    super.initState();
+    final args = Get.arguments as Map<String, dynamic>? ?? {};
+    _tourId = args['tourId']?.toString() ?? '';
+    _tourTitle = args['tourTitle']?.toString() ?? 'Tur Sohbeti';
+
+    _chatController = Get.put(ChatController());
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _chatController.startTourChat(_tourId);
+    });
+  }
 
   @override
   void dispose() {
+    // Sadece subscription iptal — reactive state değiştirme!
+    // stopListening() çağrılırsa messages.clear() Obx rebuild tetikler
+    // ve dispose sırasında ANR'ye neden olur.
+    _chatController.cancelSubscription();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
+
+  // ─── Build ───
 
   @override
   Widget build(BuildContext context) {
@@ -45,49 +78,68 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
     );
   }
 
-  // ── App Bar ──
+  // ─── App Bar ───
+
   Widget _buildAppBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.backgroundDark.withOpacity(0.8),
-        border: Border(bottom: BorderSide(color: AppColors.slate800, width: 1)),
+        border: const Border(bottom: BorderSide(color: AppColors.slate800, width: 1)),
       ),
       child: Row(
         children: [
           // Geri butonu
           GestureDetector(
             onTap: Get.back,
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: const Icon(Icons.arrow_back_ios_new, color: AppColors.primary, size: 22),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.arrow_back_ios_new, color: AppColors.primary, size: 22),
             ),
           ),
           const SizedBox(width: 12),
-          // Title
+
+          // Sohbet ikonu
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.forum, color: AppColors.success, size: 20),
+          ),
+          const SizedBox(width: 12),
+
+          // Başlık
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'Kapadokya Turu',
-                  style: TextStyle(
-                    color: AppColors.white,
-                    fontSize: 18,
+                  _tourTitle,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.3,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: 2),
-                Text(
-                  'GRUP SOHBETİ • 12 KATILIMCI',
-                  style: TextStyle(
-                    color: AppColors.slate500,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.5,
-                  ),
-                ),
+                const SizedBox(height: 2),
+                Obx(() {
+                  final count = _chatController.messages.length;
+                  return Text(
+                    'GRUP SOHBETİ • $count MESAJ',
+                    style: const TextStyle(
+                      color: AppColors.slate500,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -96,67 +148,99 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
     );
   }
 
-  // ── Chat Area ──
+  // ─── Sohbet Alanı ───
+
   Widget _buildChatArea() {
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      itemCount: _messages.length + 1, // +1 for date header
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return _buildDateHeader();
-        }
-        final msg = _messages[index - 1];
-        return _buildMessageBubble(msg);
-      },
-    );
+    return Obx(() {
+      if (_chatController.isLoading.value) {
+        return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      }
+
+      if (_chatController.messages.isEmpty) {
+        return _buildEmptyState();
+      }
+
+      return ListView.builder(
+        controller: _scrollController,
+        reverse: true,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        itemCount: _chatController.messages.length,
+        itemBuilder: (context, index) {
+          final msg = _chatController.messages[_chatController.messages.length - 1 - index];
+          final isMe = msg.senderId == _currentUserId;
+
+          return _buildMessageBubble(
+            senderName: isMe ? 'Siz' : msg.senderName,
+            text: msg.text,
+            time: _formatTime(msg.timestamp),
+            isMe: isMe,
+            // Rehberin mesajlarına rozet ekle
+            badge: msg.senderId == _currentUserId ? 'REHBER' : null,
+          );
+        },
+      );
+    });
   }
 
-  Widget _buildDateHeader() {
+  /// Henüz mesaj yokken gösterilen boş durum.
+  Widget _buildEmptyState() {
     return Center(
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 24),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.slate800.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Text(
-          'BUGÜN',
-          style: TextStyle(
-            color: AppColors.slate400,
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 1,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppColors.slate800.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.forum_outlined, color: AppColors.slate500, size: 36),
           ),
-        ),
+          const SizedBox(height: 20),
+          const Text(
+            'Henüz mesaj yok',
+            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Katılımcılarla sohbete başlayın!',
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildMessageBubble(_ChatMessage msg) {
-    final isMe = msg.isMe;
+  // ─── Mesaj Baloncuğu ───
 
+  Widget _buildMessageBubble({
+    required String senderName,
+    required String text,
+    required String time,
+    required bool isMe,
+    String? badge,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          // Sender name
+          // Gönderen adı + rozet
           Padding(
             padding: EdgeInsets.only(left: isMe ? 0 : 12, right: isMe ? 12 : 0, bottom: 4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  msg.sender,
+                  senderName,
                   style: TextStyle(
                     color: isMe ? AppColors.primary : AppColors.slate400,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (msg.badge != null) ...[
+                if (badge != null) ...[
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -165,7 +249,7 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      msg.badge!,
+                      badge,
                       style: const TextStyle(
                         color: AppColors.primary,
                         fontSize: 9,
@@ -177,7 +261,8 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
               ],
             ),
           ),
-          // Message bubble
+
+          // Mesaj kutusu
           Container(
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -200,48 +285,39 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
                   : null,
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Placeholder content area
-                Container(
-                  height: 14,
-                  width: 180,
-                  decoration: BoxDecoration(
-                    color: isMe
-                        ? Colors.white.withOpacity(0.15)
-                        : AppColors.slate700.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(4),
+                // Mesaj metni
+                Text(
+                  text,
+                  style: TextStyle(
+                    color: isMe ? Colors.white : AppColors.slate300,
+                    fontSize: 14,
+                    height: 1.4,
                   ),
                 ),
                 const SizedBox(height: 6),
-                Container(
-                  height: 14,
-                  width: 120,
-                  decoration: BoxDecoration(
-                    color: isMe
-                        ? Colors.white.withOpacity(0.1)
-                        : AppColors.slate700.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Time
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      msg.time,
-                      style: TextStyle(
-                        color: isMe ? Colors.white.withOpacity(0.5) : AppColors.slate500,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
+
+                // Saat
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        time,
+                        style: TextStyle(
+                          color: isMe ? Colors.white.withOpacity(0.5) : AppColors.slate500,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    if (isMe) ...[
-                      const SizedBox(width: 4),
-                      Icon(Icons.done_all, size: 12, color: Colors.white.withOpacity(0.6)),
+                      if (isMe) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.done_all, size: 12, color: Colors.white.withOpacity(0.6)),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -251,11 +327,12 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
     );
   }
 
-  // ── Input Bar ──
+  // ─── Mesaj Giriş Alanı ───
+
   Widget _buildInputBar() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.backgroundDark,
         border: Border(top: BorderSide(color: AppColors.slate800, width: 1)),
       ),
@@ -268,25 +345,26 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
         ),
         child: Row(
           children: [
-            // Text input
+            // Metin alanı
             Expanded(
               child: TextField(
                 controller: _messageController,
-                style: const TextStyle(color: AppColors.white, fontSize: 14),
+                style: const TextStyle(color: Colors.white, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Mesaj yazın...',
                   hintStyle: TextStyle(color: AppColors.slate600, fontSize: 14),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _handleSendMessage(),
               ),
             ),
             const SizedBox(width: 8),
-            // Send button
+
+            // Gönder butonu
             GestureDetector(
-              onTap: () {
-                // TODO: Send message
-              },
+              onTap: _handleSendMessage,
               child: Container(
                 width: 40,
                 height: 40,
@@ -301,7 +379,7 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.send, color: AppColors.white, size: 18),
+                child: const Icon(Icons.send, color: Colors.white, size: 18),
               ),
             ),
           ],
@@ -309,20 +387,39 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
       ),
     );
   }
-}
 
-class _ChatMessage {
-  final String sender;
-  final String text;
-  final String time;
-  final bool isMe;
-  final String? badge;
+  // ─── İş Mantığı ───
 
-  const _ChatMessage({
-    required this.sender,
-    required this.text,
-    required this.time,
-    required this.isMe,
-    this.badge,
-  });
+  /// Mesaj gönderir. Rehber bilgileri Firebase Auth'dan alınır.
+  void _handleSendMessage() {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    if (_tourId.isEmpty) {
+      debugPrint('TourManagerChat: tourId boş — mesaj gönderilemedi');
+      return;
+    }
+    if (_currentUserId.isEmpty) {
+      debugPrint('TourManagerChat: Kullanıcı giriş yapmamış (currentUser null)');
+      return;
+    }
+
+    debugPrint('TourManagerChat: Mesaj gönderiliyor → tourId=$_tourId, uid=$_currentUserId');
+
+    _chatController.sendMessage(
+      tourId: _tourId,
+      text: text,
+      senderName: _currentUserName,
+      senderId: _currentUserId,
+    );
+
+    _messageController.clear();
+  }
+
+  /// Timestamp'i "HH:mm" formatına çevirir.
+  String _formatTime(DateTime timestamp) {
+    final hour = timestamp.hour.toString().padLeft(2, '0');
+    final minute = timestamp.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
 }

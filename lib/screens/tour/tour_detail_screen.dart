@@ -1,6 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
+import '../../config/app_routes.dart';
 import '../../config/colors.dart';
+import '../../controllers/booking_controller.dart';
+import '../../controllers/my_tours_controller.dart';
 import '../../models/tour_model.dart';
 import '../../models/tour_program_model.dart';
 import '../../services/firebase_service.dart';
@@ -75,6 +80,40 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// Test amaçlı hızlı rezervasyon: ödeme atlayarak bilet oluşturur.
+  Future<void> _handleReservation(TourModel tour) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      Get.snackbar(
+        'Giriş Yapın',
+        'Rezervasyon yapmak için giriş yapmalısınız.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.error,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final bookingController = Get.put(BookingController());
+    await bookingController.purchaseTicket(
+      tourId: tour.id,
+      slotId: 'test_slot',
+      companyId: tour.companyId,
+      passengerName: user.displayName ?? 'Test Yolcu',
+      tcNo: '00000000000',
+      price: tour.price,
+      subMerchantKey: '',
+    );
+
+    // MyToursController'u sil ki yeniden oluşturulup loadData çağrılsın
+    if (Get.isRegistered<MyToursController>()) {
+      Get.delete<MyToursController>();
+    }
+
+    // Turlarım sayfasına yönlendir
+    Get.offNamed(AppRoutes.myTours);
   }
 
   Widget _buildHeroImage(TourModel tour) {
@@ -577,9 +616,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
             // Reservation button
             GestureDetector(
-              onTap: () {
-                // TODO: Rezervasyon işlemi
-              },
+              onTap: () => _handleReservation(tour),
               child: Container(
                 height: 48,
                 padding: const EdgeInsets.symmetric(horizontal: 24),
