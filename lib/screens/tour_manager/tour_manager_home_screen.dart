@@ -1,54 +1,158 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 
 import '../../config/colors.dart';
+import '../../services/firebase_service.dart';
 
-class TourManagerHomeScreen extends StatelessWidget {
+class TourManagerHomeScreen extends StatefulWidget {
   const TourManagerHomeScreen({super.key});
 
   @override
+  State<TourManagerHomeScreen> createState() => _TourManagerHomeScreenState();
+}
+
+class _GuideDashboardData {
+  final String guideName;
+  final String tourId;
+  final String tourTitle;
+  final int totalParticipants;
+  final int checkedInParticipants;
+
+  const _GuideDashboardData({
+    required this.guideName,
+    this.tourId = '',
+    this.tourTitle = '',
+    this.totalParticipants = 0,
+    this.checkedInParticipants = 0,
+  });
+
+  int get pendingParticipants {
+    final pending = totalParticipants - checkedInParticipants;
+    return pending < 0 ? 0 : pending;
+  }
+
+  double get progress {
+    if (totalParticipants <= 0) return 0;
+    final value = checkedInParticipants / totalParticipants;
+    if (value < 0) return 0;
+    if (value > 1) return 1;
+    return value;
+  }
+}
+
+class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
+  final FirebaseService _firebaseService = FirebaseService();
+  late final Future<_GuideDashboardData> _dashboardFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _dashboardFuture = _loadDashboardData();
+  }
+
+  Future<_GuideDashboardData> _loadDashboardData() async {
+    final guideUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final guideName = await _getGuideFullName();
+
+    if (guideUid.isEmpty) {
+      return const _GuideDashboardData(guideName: 'Tur Sorumlusu');
+    }
+
+    final assignedTour = await _firebaseService.getAssignedTourForGuide(guideUid);
+    if (assignedTour == null) {
+      return _GuideDashboardData(guideName: guideName);
+    }
+
+    final participants = await _firebaseService.getTourParticipants(assignedTour.id);
+    final activeParticipants = participants.where((item) {
+      final status = item['status']?.toString().toLowerCase() ?? '';
+      return status != 'cancelled';
+    }).toList();
+
+    final totalCount = activeParticipants.length;
+    final checkedInCount = activeParticipants.where((item) {
+      final status = item['status']?.toString().toLowerCase() ?? '';
+      final scanned = item['isScanned'] == true;
+      return scanned || status == 'checked_in';
+    }).length;
+
+    return _GuideDashboardData(
+      guideName: guideName,
+      tourId: assignedTour.id,
+      tourTitle: assignedTour.title,
+      totalParticipants: totalCount,
+      checkedInParticipants: checkedInCount,
+    );
+  }
+
+  Future<String> _getGuideFullName() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return 'Tur Sorumlusu';
+
+    // TODO: Kullanıcı/rehber veri yapısı değiştiğinde bu kaynak yeni profile endpoint'ine taşınacak.
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    if (!doc.exists) return 'Tur Sorumlusu';
+
+    final data = doc.data();
+    final fullName = data?['fullName']?.toString().trim() ?? '';
+    return fullName.isEmpty ? 'Tur Sorumlusu' : fullName;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    // Tur başlığı
-                    _buildTourTitle(),
-                    const SizedBox(height: 16),
-                    // İstatistik kartları
-                    _buildStatCards(),
-                    const SizedBox(height: 16),
-                    // Giriş durumu progress
-                    _buildProgressCard(),
-                    const SizedBox(height: 24),
-                    // QR Tara butonu
-                    _buildScanButton(),
-                    const SizedBox(height: 28),
-                    // Yönetim Araçları
-                    _buildManagementTools(),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+    return FutureBuilder<_GuideDashboardData>(
+      future: _dashboardFuture,
+      builder: (context, snapshot) {
+        final dashboard = snapshot.data ?? const _GuideDashboardData(guideName: 'Tur Sorumlusu');
+
+        return Scaffold(
+          backgroundColor: AppColors.backgroundDark,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(dashboard.guideName),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        _buildTourTitle(dashboard.tourTitle),
+                        const SizedBox(height: 16),
+                        _buildStatCards(
+                          dashboard.totalParticipants,
+                          dashboard.checkedInParticipants,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildProgressCard(dashboard.pendingParticipants, dashboard.progress),
+                        const SizedBox(height: 24),
+                        _buildScanButton(dashboard.tourId, dashboard.tourTitle),
+                        const SizedBox(height: 28),
+                        _buildManagementTools(
+                          tourId: dashboard.tourId,
+                          tourTitle: dashboard.tourTitle,
+                          checkedInCount: dashboard.checkedInParticipants,
+                          pendingCount: dashboard.pendingParticipants,
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   // ── Header ──
-  Widget _buildHeader() {
+  Widget _buildHeader(String guideName) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -79,17 +183,22 @@ class TourManagerHomeScreen extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'TurAssist',
-                  style: TextStyle(
+                  guideName.trim().isEmpty ? 'Tur Sorumlusu' : guideName,
+                  style: const TextStyle(
                     color: AppColors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.3,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                Text('Yönetici Portalı', style: TextStyle(color: AppColors.slate400, fontSize: 12)),
+                const Text(
+                  'Tur Sorumlusu',
+                  style: TextStyle(color: AppColors.slate400, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -123,37 +232,45 @@ class TourManagerHomeScreen extends StatelessWidget {
   }
 
   // ── Tur Başlığı ──
-  Widget _buildTourTitle() {
+  Widget _buildTourTitle(String tourTitle) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
+      children: [
         Text(
-          'Roma Gün Batımı Yürüyüşü',
-          style: TextStyle(
+          tourTitle.trim().isEmpty ? 'Atanmış tur bulunamadı' : tourTitle,
+          style: const TextStyle(
             color: AppColors.white,
             fontSize: 24,
             fontWeight: FontWeight.bold,
             letterSpacing: -0.5,
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
       ],
     );
   }
 
   // ── İstatistik kartları ──
-  Widget _buildStatCards() {
+  Widget _buildStatCards(int totalCount, int checkedInCount) {
+    final occupancyPercent = totalCount == 0 ? 0 : ((checkedInCount / totalCount) * 100).round();
     return Row(
       children: [
-        Expanded(child: _statCard('TOPLAM KATILIMCI', '24', '%100 Doluluk', AppColors.success)),
+        Expanded(
+          child: _statCard(
+            'TOPLAM KATILIMCI',
+            '$totalCount',
+            totalCount == 0 ? 'Henüz katılımcı yok' : '%$occupancyPercent Katılım',
+            AppColors.success,
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: _statCard(
             'GİRİŞ YAPILDI',
-            '18',
-            '%75 Tamamlandı',
+            '$checkedInCount',
+            totalCount == 0 ? '%0 Tamamlandı' : '%$occupancyPercent Tamamlandı',
             AppColors.primary,
-            suffix: '/24',
+            suffix: '/$totalCount',
           ),
         ),
       ],
@@ -214,7 +331,8 @@ class TourManagerHomeScreen extends StatelessWidget {
   }
 
   // ── Giriş Durumu Progress ──
-  Widget _buildProgressCard() {
+  Widget _buildProgressCard(int pendingCount, double progress) {
+    final percentText = (progress * 100).round();
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -230,8 +348,8 @@ class TourManagerHomeScreen extends StatelessWidget {
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
+                children: [
+                  const Text(
                     'Giriş Durumu',
                     style: TextStyle(
                       color: AppColors.white,
@@ -239,16 +357,16 @@ class TourManagerHomeScreen extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
-                    '6 misafir bekleniyor',
-                    style: TextStyle(color: AppColors.slate400, fontSize: 12),
+                    '$pendingCount misafir bekleniyor',
+                    style: const TextStyle(color: AppColors.slate400, fontSize: 12),
                   ),
                 ],
               ),
-              const Text(
-                '%75',
-                style: TextStyle(
+              Text(
+                '%$percentText',
+                style: const TextStyle(
                   color: AppColors.primary,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -261,7 +379,7 @@ class TourManagerHomeScreen extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: 0.75,
+              value: progress,
               minHeight: 10,
               backgroundColor: AppColors.slate700,
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
@@ -273,14 +391,16 @@ class TourManagerHomeScreen extends StatelessWidget {
   }
 
   // ── QR Tara Butonu ──
-  Widget _buildScanButton() {
+  Widget _buildScanButton(String tourId, String tourTitle) {
     return SizedBox(
       width: double.infinity,
       height: 64,
       child: ElevatedButton.icon(
-        onPressed: () {
-          Get.toNamed('/qr-scanner');
-        },
+        onPressed: tourId.trim().isEmpty
+            ? null
+            : () {
+                Get.toNamed('/qr-scanner', arguments: {'tourId': tourId, 'tourTitle': tourTitle});
+              },
         icon: const Icon(Icons.qr_code_scanner, size: 28),
         label: const Text(
           'QR Kodu Tara',
@@ -298,7 +418,14 @@ class TourManagerHomeScreen extends StatelessWidget {
   }
 
   // ── Yönetim Araçları ──
-  Widget _buildManagementTools() {
+  Widget _buildManagementTools({
+    required String tourId,
+    required String tourTitle,
+    required int checkedInCount,
+    required int pendingCount,
+  }) {
+    final hasAssignedTour = tourId.trim().isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -315,13 +442,18 @@ class TourManagerHomeScreen extends StatelessWidget {
           title: 'Katılımcıları Gör',
           subtitle: null,
           badges: [
-            _badge(Icons.check_circle, '18 Giriş', AppColors.success),
-            _badge(Icons.cancel, '6 Bekliyor', AppColors.error),
+            _badge(Icons.check_circle, '$checkedInCount Giriş', AppColors.success),
+            _badge(Icons.cancel, '$pendingCount Bekliyor', AppColors.error),
           ],
-          showNotification: true,
-          onTap: () {
-            Get.toNamed('/tour-manager-customers');
-          },
+          showNotification: pendingCount > 0,
+          onTap: !hasAssignedTour
+              ? null
+              : () {
+                  Get.toNamed(
+                    '/tour-manager-customers',
+                    arguments: {'tourId': tourId, 'tourTitle': tourTitle},
+                  );
+                },
         ),
         const SizedBox(height: 12),
         // Duyuru Yap
@@ -331,9 +463,14 @@ class TourManagerHomeScreen extends StatelessWidget {
           iconBgColor: AppColors.warning.withOpacity(0.12),
           title: 'Duyuru Yap',
           subtitle: 'Tüm katılımcılara bildirim gönder',
-          onTap: () {
-            Get.toNamed('/tour-manager-announcements');
-          },
+          onTap: !hasAssignedTour
+              ? null
+              : () {
+                  Get.toNamed(
+                    '/tour-manager-announcements',
+                    arguments: {'tourId': tourId, 'tourTitle': tourTitle},
+                  );
+                },
         ),
         const SizedBox(height: 12),
         // Sohbete Göz At
@@ -342,15 +479,16 @@ class TourManagerHomeScreen extends StatelessWidget {
           iconColor: AppColors.success,
           iconBgColor: AppColors.success.withOpacity(0.12),
           title: 'Sohbete Göz At',
-          subtitle: 'Gruptan 3 okunmamış mesaj',
-          showDot: true,
-          onTap: () {
-            // TODO: Dinamik tourId/tourTitle kullanılacak
-            Get.toNamed(
-              '/tour-manager-chat',
-              arguments: {'tourId': 'test_tour_id', 'tourTitle': 'Roma Gün Batımı Yürüyüşü'},
-            );
-          },
+          subtitle: hasAssignedTour ? 'Katılımcılar ile sohbet' : 'Önce tur ataması gerekli',
+          showDot: hasAssignedTour,
+          onTap: !hasAssignedTour
+              ? null
+              : () {
+                  Get.toNamed(
+                    '/tour-manager-chat',
+                    arguments: {'tourId': tourId, 'tourTitle': tourTitle},
+                  );
+                },
         ),
       ],
     );

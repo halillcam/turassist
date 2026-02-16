@@ -4,15 +4,17 @@ class ChatModel {
   final String id;
   final String senderId; //
   final String senderName; //
+  final String senderRole;
   final String text; //
-  final DateTime timestamp; //
+  final DateTime createdAt; //
 
   ChatModel({
     required this.id,
     required this.senderId,
     required this.senderName,
+    required this.senderRole,
     required this.text,
-    required this.timestamp,
+    required this.createdAt,
   });
 
   factory ChatModel.fromFirestore(DocumentSnapshot doc) {
@@ -21,8 +23,12 @@ class ChatModel {
       id: doc.id,
       senderId: data['senderId']?.toString() ?? '',
       senderName: data['senderName'] ?? '',
+      senderRole: data['senderRole']?.toString() ?? 'customer',
       text: data['text'] ?? '',
-      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt:
+          (data['createdAt'] as Timestamp?)?.toDate() ??
+          (data['timestamp'] as Timestamp?)?.toDate() ??
+          DateTime.now(),
     );
   }
 
@@ -30,8 +36,9 @@ class ChatModel {
     return {
       'senderId': senderId,
       'senderName': senderName,
+      'senderRole': senderRole,
       'text': text,
-      'timestamp': Timestamp.fromDate(timestamp),
+      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 }

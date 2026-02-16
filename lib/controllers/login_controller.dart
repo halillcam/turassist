@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/app_routes.dart';
 import '../config/colors.dart';
 import '../models/user_model.dart';
 import '../services/firebase_service.dart';
@@ -177,15 +178,17 @@ class LoginController extends GetxController {
   /// - Admin/Super Admin → Hata mesajı (mobil kullanılamaz)
   /// - Müşteri → Şehir seçilmişse tur listesi, değilse şehir seçim ekranı
   Future<void> _navigateAfterAuth(UserModel user) async {
-    switch (user.role) {
+    final role = user.role.trim().toLowerCase();
+
+    switch (role) {
       case 'guide':
-        Get.offAllNamed('/guide-dashboard');
+        Get.offAllNamed(AppRoutes.guideDashboard);
         return;
 
       case 'admin':
       case 'super_admin':
         _showError("Bu hesap mobil uygulamada kullanılamaz. Web admin panelini kullanınız.");
-        Get.offAllNamed('/login');
+        Get.offAllNamed(AppRoutes.login);
         return;
 
       default:
@@ -194,9 +197,9 @@ class LoginController extends GetxController {
         final savedCity = prefs.getString('selected_city') ?? '';
 
         if (savedCity.isNotEmpty) {
-          Get.offAllNamed('/tour-list');
+          Get.offAllNamed(AppRoutes.tourList);
         } else {
-          Get.offAllNamed('/city-selection');
+          Get.offAllNamed(AppRoutes.citySelection);
         }
     }
   }

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../config/colors.dart';
 import '../models/chat_model.dart';
 import '../services/firebase_service.dart';
 
@@ -65,13 +64,15 @@ class ChatController extends GetxController {
     required String text,
     required String senderName,
     required String senderId,
+    required String senderRole,
   }) async {
     final newMessage = ChatModel(
       id: '',
       senderId: senderId,
       senderName: senderName,
+      senderRole: senderRole,
       text: text,
-      timestamp: DateTime.now(),
+      createdAt: DateTime.now(),
     );
     await _firebaseService.sendChatMessage(tourId, newMessage);
     debugPrint('ChatController: Mesaj Firestore\'a yazıldı ✓');

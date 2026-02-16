@@ -2,11 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../services/firebase_service.dart';
+import '../models/city_model.dart';
 import 'tour_controller.dart';
 
 class CityController extends GetxController {
-  final FirebaseService _firebaseService = FirebaseService();
   var selectedCity = "".obs;
   var cities = <String>[].obs;
   var isLoading = false.obs;
@@ -47,8 +46,7 @@ class CityController extends GetxController {
   Future<void> getCities() async {
     try {
       isLoading.value = true;
-      var result = await _firebaseService.getAllCities();
-      cities.assignAll(result);
+      cities.assignAll(cityList.map((item) => item.name));
     } catch (e) {
       debugPrint('Şehirleri yüklerken hata: $e');
     } finally {

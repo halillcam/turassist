@@ -31,7 +31,8 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
 
   /// Rehberin Firebase Auth bilgileri.
   String get _currentUserId => FirebaseAuth.instance.currentUser?.uid ?? '';
-  String get _currentUserName => FirebaseAuth.instance.currentUser?.displayName ?? 'Rehber';
+  // TODO: İleride tur sorumlusunun ad-soyadını kullanıcı profilinden dinamik çek.
+  String get _currentUserName => 'Tur Sorumlusu';
 
   // ─── Lifecycle ───
 
@@ -172,10 +173,11 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
           return _buildMessageBubble(
             senderName: isMe ? 'Siz' : msg.senderName,
             text: msg.text,
-            time: _formatTime(msg.timestamp),
+            time: _formatTime(msg.createdAt),
             isMe: isMe,
             // Rehberin mesajlarına rozet ekle
-            badge: msg.senderId == _currentUserId ? 'REHBER' : null,
+            badge: msg.senderRole == 'guide' ? 'TUR SORUMLUSU' : null,
+            isGuideMessage: msg.senderRole == 'guide',
           );
         },
       );
@@ -220,7 +222,12 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
     required String time,
     required bool isMe,
     String? badge,
+    required bool isGuideMessage,
   }) {
+    final bubbleColor = isGuideMessage
+        ? AppColors.warning.withOpacity(0.28)
+        : (isMe ? AppColors.primary : AppColors.slate800.withOpacity(0.8));
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -267,7 +274,7 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: isMe ? AppColors.primary : AppColors.slate800.withOpacity(0.8),
+              color: bubbleColor,
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(18),
                 topRight: const Radius.circular(18),
@@ -411,6 +418,7 @@ class _TourManagerChatScreenState extends State<TourManagerChatScreen> {
       text: text,
       senderName: _currentUserName,
       senderId: _currentUserId,
+      senderRole: 'guide',
     );
 
     _messageController.clear();

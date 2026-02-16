@@ -49,8 +49,8 @@ class MyToursController extends GetxController {
       }
       tickets.assignAll(userTickets);
 
-      // checked_in olan bilet varsa aktif tur olarak yükle
-      final checkedIn = userTickets.where((t) => t.status == 'checked_in').toList();
+      // checked_in veya isScanned olan bilet varsa aktif tur olarak yükle
+      final checkedIn = userTickets.where((t) => t.status == 'checked_in' || t.isScanned).toList();
       if (checkedIn.isNotEmpty) {
         checkedInTicket.value = checkedIn.first;
         await _loadActiveTourDetail(checkedIn.first.tourId);
@@ -101,8 +101,47 @@ class MyToursController extends GetxController {
   ///
   /// Biletin turunu aktif tur olarak yükler ve detay görünümüne geçer.
   Future<void> checkInTicket(TicketModel ticket) async {
-    checkedInTicket.value = ticket;
-    await _loadActiveTourDetail(ticket.tourId);
+    // Simülasyonda da rehber paneline yansıması için Firestore'a check-in bilgisi yaz.
+    final qrUpdateOk = await _firebaseService.updateTicketQRStatus(ticket.id);
+    final statusFallbackOk = qrUpdateOk
+        ? true
+        : await _firebaseService.updateTicketStatus(ticket.id, 'checked_in');
+
+    if (!statusFallbackOk) {
+      Get.snackbar(
+        'QR Okutma Hatası',
+        'Check-in bilgisi kaydedilemedi. Firestore yetkilerini kontrol edin.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.error,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final updatedTicket = TicketModel(
+      id: ticket.id,
+      tourId: ticket.tourId,
+      userId: ticket.userId,
+      companyId: ticket.companyId,
+      slotId: ticket.slotId,
+      passengerName: ticket.passengerName,
+      tcNo: ticket.tcNo,
+      pricePaid: ticket.pricePaid,
+      status: 'checked_in',
+      qrToken: ticket.qrToken,
+      isScanned: qrUpdateOk ? true : ticket.isScanned,
+      purchaseDate: ticket.purchaseDate,
+      scannedAt: DateTime.now(),
+    );
+
+    final index = tickets.indexWhere((item) => item.id == ticket.id);
+    if (index != -1) {
+      tickets[index] = updatedTicket;
+      tickets.refresh();
+    }
+
+    checkedInTicket.value = updatedTicket;
+    await _loadActiveTourDetail(updatedTicket.tourId);
 
     Get.snackbar(
       'QR Okutuldu',

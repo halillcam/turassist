@@ -312,6 +312,8 @@ class _ActiveTourDetailView extends StatelessWidget {
                     const SizedBox(height: 12),
                     _buildGuideCard(tour.guideName ?? 'Rehber', tour.busInfo.phoneNumber),
                     const SizedBox(height: 12),
+                    _buildAnnouncementsCard(tour.id, tour.title),
+                    const SizedBox(height: 12),
                     _buildChatCard(tour.id, tour.title),
                     const SizedBox(height: 28),
                     if (program.isNotEmpty) _buildProgramSection(program, tour.createdAt),
@@ -576,6 +578,78 @@ class _ActiveTourDetailView extends StatelessWidget {
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.success.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Tur duyurularına erişim kartı.
+  Widget _buildAnnouncementsCard(String tourId, String tourTitle) {
+    return GestureDetector(
+      onTap: () => Get.toNamed(
+        AppRoutes.tourAnnouncements,
+        arguments: {'tourId': tourId, 'tourTitle': tourTitle},
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardDark,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.slate800),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.warning.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.campaign_outlined, color: AppColors.warning, size: 24),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tur Duyuruları',
+                    style: TextStyle(
+                      color: AppColors.slate400,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Geçmiş bildirimleri görüntüle',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.warning,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.warning.withOpacity(0.3),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

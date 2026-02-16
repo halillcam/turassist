@@ -69,6 +69,28 @@ class FirebaseService {
     }
   }
 
+  // Rehbere atanmış aktif turu getir
+  Future<TourModel?> getAssignedTourForGuide(String guideId) async {
+    try {
+      if (guideId.trim().isEmpty) return null;
+
+      final snapshot = await _firestore
+          .collection('tours')
+          .where('guideId', isEqualTo: guideId)
+          .where('isDeleted', isEqualTo: false)
+          .get();
+
+      if (snapshot.docs.isEmpty) return null;
+
+      final tours = snapshot.docs.map(TourModel.fromFirestore).toList();
+      tours.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return tours.first;
+    } catch (e) {
+      debugPrint('Error fetching assigned guide tour: $e');
+      return null;
+    }
+  }
+
   // Tur programını getir (order alanına göre sıralı)
   Future<List<TourProgramDay>> getTourProgram(String tourId) async {
     try {
@@ -101,10 +123,13 @@ class FirebaseService {
       final snapshot = await _firestore
           .collection('tickets')
           .where('tourId', isEqualTo: tourId)
-          .where('status', isNotEqualTo: 'cancelled')
           .get();
 
-      return snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+      final all = snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+      return all.where((item) {
+        final status = item['status']?.toString().toLowerCase() ?? '';
+        return status != 'cancelled';
+      }).toList();
     } catch (e) {
       debugPrint('Error fetching tour participants: $e');
       return [];
@@ -273,7 +298,7 @@ class FirebaseService {
         .collection('tours')
         .doc(tourId)
         .collection('messages')
-        .orderBy('timestamp', descending: false)
+        .orderBy('createdAt', descending: false)
         .snapshots()
         .map((snapshot) {
           debugPrint('getChatMessages: snapshot → ${snapshot.docs.length} mesaj');
@@ -288,7 +313,7 @@ class FirebaseService {
           .collection('tours')
           .doc(tourId)
           .collection('messages')
-          .orderBy('timestamp', descending: false)
+          .orderBy('createdAt', descending: false)
           .get();
 
       return snapshot.docs.map(ChatModel.fromFirestore).toList();
@@ -322,6 +347,7 @@ class FirebaseService {
           .add(announcement.toJson());
     } catch (e) {
       debugPrint('Announcement Error: $e');
+      throw Exception('Duyuru kaydedilemedi: $e');
     }
   }
 
@@ -335,6 +361,29 @@ class FirebaseService {
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map(AnnouncementModel.fromFirestore).toList();
+        });
+  }
+
+  // Customer için fallback: kendi bildirimlerinden tur duyurularını dinle
+  Stream<List<AnnouncementModel>> getUserTourNotifications(String userId, String tourId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('notifications')
+        .where('tourId', isEqualTo: tourId)
+        .snapshots()
+        .map((snapshot) {
+          final list = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return AnnouncementModel(
+              id: doc.id,
+              notification: data['message']?.toString() ?? '',
+              createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            );
+          }).toList();
+
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
         });
   }
 
@@ -392,6 +441,7 @@ class FirebaseService {
       }
     } catch (e) {
       debugPrint('Error sending notification: $e');
+      throw Exception('Katılımcı bildirimleri kaydedilemedi: $e');
     }
   }
 

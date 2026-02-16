@@ -173,8 +173,9 @@ class _ChatScreenState extends State<ChatScreen> {
           return _buildMessageBubble(
             senderName: isMe ? 'Siz' : msg.senderName,
             text: msg.text,
-            time: _formatTime(msg.timestamp),
+            time: _formatTime(msg.createdAt),
             isMe: isMe,
+            senderRole: msg.senderRole,
           );
         },
       );
@@ -218,7 +219,13 @@ class _ChatScreenState extends State<ChatScreen> {
     required String text,
     required String time,
     required bool isMe,
+    required String senderRole,
   }) {
+    final isGuideMessage = senderRole == 'guide';
+    final bubbleColor = isGuideMessage
+        ? AppColors.warning.withOpacity(0.28)
+        : (isMe ? AppColors.primary : AppColors.slate800.withOpacity(0.8));
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -227,13 +234,36 @@ class _ChatScreenState extends State<ChatScreen> {
           // Gönderen adı
           Padding(
             padding: EdgeInsets.only(left: isMe ? 0 : 12, right: isMe ? 12 : 0, bottom: 4),
-            child: Text(
-              senderName,
-              style: TextStyle(
-                color: isMe ? AppColors.primary : AppColors.slate400,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  senderName,
+                  style: TextStyle(
+                    color: isMe ? AppColors.primary : AppColors.slate400,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (isGuideMessage) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'TUR SORUMLUSU',
+                      style: TextStyle(
+                        color: AppColors.warning,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
 
@@ -242,7 +272,7 @@ class _ChatScreenState extends State<ChatScreen> {
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: isMe ? AppColors.primary : AppColors.slate800.withOpacity(0.8),
+              color: bubbleColor,
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(18),
                 topRight: const Radius.circular(18),
@@ -391,6 +421,7 @@ class _ChatScreenState extends State<ChatScreen> {
         text: text,
         senderName: _currentUserName,
         senderId: _currentUserId,
+        senderRole: 'customer',
       );
     } catch (e) {
       debugPrint('Chat: Mesaj gönderme hatası (UI) → $e');

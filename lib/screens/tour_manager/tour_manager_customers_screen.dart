@@ -1,7 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../config/colors.dart';
+import '../../services/firebase_service.dart';
 
 class TourManagerCustomersScreen extends StatefulWidget {
   const TourManagerCustomersScreen({super.key});
@@ -11,16 +13,14 @@ class TourManagerCustomersScreen extends StatefulWidget {
 }
 
 class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen> {
+  final FirebaseService _firebaseService = FirebaseService();
   final TextEditingController _searchController = TextEditingController();
   int _selectedTab = 0; // 0: Tümü, 1: Gelenler, 2: Gelmeyenler
+  String _tourId = '';
+  String _tourTitle = '';
+  bool _isLoading = true;
 
-  final List<_Participant> _allParticipants = [
-    _Participant(name: 'Caner Yılmaz', phone: '0532 123 45 67', arrived: true, isVip: true),
-    _Participant(name: 'Merve Aydın', phone: '0544 987 65 43', arrived: false),
-    _Participant(name: 'Ahmet Demir', phone: '0505 111 22 33', arrived: true),
-    _Participant(name: 'Selin Kaya', phone: '0536 444 55 66', arrived: false),
-    _Participant(name: 'Emre Can', phone: '0552 777 88 99', arrived: false),
-  ];
+  final List<_Participant> _allParticipants = [];
 
   List<_Participant> get _filteredParticipants {
     var list = _allParticipants;
@@ -34,7 +34,9 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
     final query = _searchController.text.toLowerCase();
     if (query.isNotEmpty) {
       list = list
-          .where((p) => p.name.toLowerCase().contains(query) || p.phone.contains(query))
+          .where(
+            (p) => p.name.toLowerCase().contains(query) || p.subtitle.toLowerCase().contains(query),
+          )
           .toList();
     }
     return list;
@@ -42,6 +44,64 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
 
   int get _arrivedCount => _allParticipants.where((p) => p.arrived).length;
   int get _pendingCount => _allParticipants.where((p) => !p.arrived).length;
+
+  @override
+  void initState() {
+    super.initState();
+    final args = Get.arguments as Map<String, dynamic>? ?? {};
+    _tourId = args['tourId']?.toString().trim() ?? '';
+    _tourTitle = args['tourTitle']?.toString().trim() ?? '';
+    _loadParticipants();
+  }
+
+  Future<void> _loadParticipants() async {
+    setState(() => _isLoading = true);
+
+    if (_tourId.isEmpty) {
+      final guideId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      if (guideId.isNotEmpty) {
+        final assignedTour = await _firebaseService.getAssignedTourForGuide(guideId);
+        if (assignedTour != null) {
+          _tourId = assignedTour.id;
+          if (_tourTitle.isEmpty) {
+            _tourTitle = assignedTour.title;
+          }
+        }
+      }
+    }
+
+    if (_tourId.isEmpty) {
+      setState(() {
+        _allParticipants.clear();
+        _isLoading = false;
+      });
+      return;
+    }
+
+    final result = await _firebaseService.getTourParticipants(_tourId);
+    final parsed = result.map((item) {
+      final status = item['status']?.toString().toLowerCase() ?? '';
+      final scanned = item['isScanned'] == true;
+      final arrived = scanned || status == 'checked_in';
+
+      return _Participant(
+        name: item['passengerName']?.toString().trim().isNotEmpty == true
+            ? item['passengerName'].toString()
+            : 'İsimsiz Katılımcı',
+        subtitle: item['tcNo']?.toString().trim().isNotEmpty == true
+            ? 'TC: ${item['tcNo']}'
+            : 'Kimlik bilgisi yok',
+        arrived: arrived,
+      );
+    }).toList();
+
+    setState(() {
+      _allParticipants
+        ..clear()
+        ..addAll(parsed);
+      _isLoading = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -59,7 +119,11 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
             _buildAppBar(),
             _buildStatsBar(),
             _buildSearchAndTabs(),
-            Expanded(child: _buildParticipantList()),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                  : _buildParticipantList(),
+            ),
           ],
         ),
       ),
@@ -86,8 +150,8 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
           // Title
           Expanded(
             child: Column(
-              children: const [
-                Text(
+              children: [
+                const Text(
                   'Katılımcı Listesi',
                   style: TextStyle(
                     color: AppColors.white,
@@ -96,10 +160,10 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
                     letterSpacing: -0.3,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Büyük Kanyon Ekspresi #402',
-                  style: TextStyle(color: AppColors.slate400, fontSize: 12),
+                  _tourTitle.isEmpty ? 'Atanmış tur yok' : _tourTitle,
+                  style: const TextStyle(color: AppColors.slate400, fontSize: 12),
                 ),
               ],
             ),
@@ -335,28 +399,9 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
                 Row(
                   children: [
                     Text(
-                      participant.phone,
+                      participant.subtitle,
                       style: const TextStyle(color: AppColors.slate400, fontSize: 12),
                     ),
-                    if (participant.isVip) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.slate800,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'VIP',
-                          style: TextStyle(
-                            color: AppColors.slate500,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ],
@@ -404,14 +449,8 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
 
 class _Participant {
   final String name;
-  final String phone;
+  final String subtitle;
   final bool arrived;
-  final bool isVip;
 
-  const _Participant({
-    required this.name,
-    required this.phone,
-    required this.arrived,
-    this.isVip = false,
-  });
+  const _Participant({required this.name, required this.subtitle, required this.arrived});
 }

@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -7,12 +8,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config/app_routes.dart';
 import 'config/app_theme.dart';
 import 'firebase_options.dart';
+import 'services/local_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await initializeDateFormatting('tr_TR', null);
+  await LocalNotificationService.instance.initialize();
 
   // Şehir seçimi yapılmış mı kontrol et
   final prefs = await SharedPreferences.getInstance();

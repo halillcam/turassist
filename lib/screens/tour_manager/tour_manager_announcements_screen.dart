@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../../config/colors.dart';
+import '../../controllers/announcement_controller.dart';
 
 class TourManagerAnnouncementsScreen extends StatefulWidget {
   const TourManagerAnnouncementsScreen({super.key});
@@ -13,23 +15,10 @@ class TourManagerAnnouncementsScreen extends StatefulWidget {
 class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncementsScreen> {
   final TextEditingController _messageController = TextEditingController();
   final int _maxLength = 280;
-
-  // Örnek önceki duyurular
-  final List<Map<String, String>> _previousAnnouncements = [
-    {
-      'time': 'BUGÜN, 14:20',
-      'message':
-          '"Müze gezimiz tamamlanmıştır. Herkesin 10 dakika içinde otopark alanındaki 34 ABC 123 plakalı otobüste olmasını rica ederim."',
-    },
-    {
-      'time': 'BUGÜN, 12:45',
-      'message': '"Öğle yemeği molası başlamıştır. Toplanma yerimiz restoran girişidir."',
-    },
-    {
-      'time': 'BUGÜN, 09:00',
-      'message': '"Turumuz başlıyor! Lütfen yaka kartlarınızı takmayı unutmayın."',
-    },
-  ];
+  late final String _controllerTag;
+  late final AnnouncementController _announcementController;
+  late final String _tourId;
+  late final String _tourTitle;
 
   // Hazır mesaj şablonları
   final List<Map<String, String>> _quickMessages = [
@@ -38,11 +27,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
       'label': 'Otobüs Kalkış',
       'text': 'Otobüs 5 dakika içinde kalkıyor. Lütfen yerinize geçin.',
     },
-    {
-      'emoji': 'ğŸ“',
-      'label': 'Girişte Buluşma',
-      'text': 'Lütfen giriş noktasında toplanın.',
-    },
+    {'emoji': 'ğŸ“', 'label': 'Girişte Buluşma', 'text': 'Lütfen giriş noktasında toplanın.'},
     {
       'emoji': 'ğŸ½ï¸',
       'label': 'Yemek Molası',
@@ -51,8 +36,24 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _controllerTag = 'guide-ann-${UniqueKey()}';
+    _announcementController = Get.put(AnnouncementController(), tag: _controllerTag);
+
+    final args = Get.arguments as Map<String, dynamic>? ?? {};
+    _tourId = args['tourId']?.toString().trim() ?? '';
+    _tourTitle = args['tourTitle']?.toString().trim() ?? '';
+
+    if (_tourId.isNotEmpty) {
+      _announcementController.listenAnnouncements(_tourId);
+    }
+  }
+
+  @override
   void dispose() {
     _messageController.dispose();
+    Get.delete<AnnouncementController>(tag: _controllerTag, force: true);
     super.dispose();
   }
 
@@ -128,8 +129,8 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
+              children: [
+                const Text(
                   'Duyuru Gönder',
                   style: TextStyle(
                     color: AppColors.white,
@@ -139,8 +140,8 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
                   ),
                 ),
                 Text(
-                  'Antik Kent Turu • Grup A',
-                  style: TextStyle(color: AppColors.slate500, fontSize: 12),
+                  _tourTitle.isEmpty ? 'Atanmış tur yok' : _tourTitle,
+                  style: const TextStyle(color: AppColors.slate500, fontSize: 12),
                 ),
               ],
             ),
@@ -224,8 +225,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
                   onChanged: (_) => setState(() {}),
                   style: const TextStyle(color: AppColors.white, fontSize: 16, height: 1.5),
                   decoration: InputDecoration(
-                    hintText:
-                        'Mesajınızı buraya yazın... (Örn: Otobüs 5 dakika içinde kalkıyor)',
+                    hintText: 'Mesajınızı buraya yazın... (Örn: Otobüs 5 dakika içinde kalkıyor)',
                     hintStyle: TextStyle(color: AppColors.slate500, fontSize: 15),
                     filled: true,
                     fillColor: AppColors.slate800.withOpacity(0.5),
@@ -258,18 +258,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
-                onPressed: _messageController.text.trim().isEmpty
-                    ? null
-                    : () {
-                        // TODO: Send announcement
-                        setState(() {
-                          _previousAnnouncements.insert(0, {
-                            'time': 'AZ ÖNCE',
-                            'message': '"${_messageController.text.trim()}"',
-                          });
-                          _messageController.clear();
-                        });
-                      },
+                onPressed: _messageController.text.trim().isEmpty ? null : _sendAnnouncement,
                 icon: const Icon(Icons.send, size: 22),
                 label: const Text(
                   'Tüm Katılımcılara Gönder',
@@ -365,51 +354,122 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
             ],
           ),
           const SizedBox(height: 16),
-          // Duyuru kartları
-          ...List.generate(_previousAnnouncements.length, (index) {
-            final announcement = _previousAnnouncements[index];
-            final isFirst = index == 0;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Opacity(
-                opacity: isFirst ? 1.0 : 0.7,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.slate900.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.slate800.withOpacity(0.6)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        announcement['time']!,
-                        style: const TextStyle(
-                          color: AppColors.slate500,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        announcement['message']!,
-                        style: TextStyle(
-                          color: isFirst ? AppColors.slate200 : AppColors.slate400,
-                          fontSize: 14,
-                          height: 1.5,
-                          fontWeight: isFirst ? FontWeight.w500 : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+          Obx(() {
+            if (_announcementController.isLoading.value) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              );
+            }
+
+            final err = _announcementController.errorMessage.value;
+            if (err.isEmpty) return const SizedBox.shrink();
+
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.error.withOpacity(0.35)),
               ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(err, style: const TextStyle(color: AppColors.errorLight, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => _announcementController.listenAnnouncements(_tourId),
+                    child: const Text('Tekrar dene', style: TextStyle(color: AppColors.white)),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          Obx(() {
+            final announcements = _announcementController.announcements;
+            if (announcements.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.slate900.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.slate800.withOpacity(0.6)),
+                ),
+                child: const Text(
+                  'Henüz duyuru yok.',
+                  style: TextStyle(color: AppColors.slate400, fontSize: 13),
+                ),
+              );
+            }
+
+            return Column(
+              children: List.generate(announcements.length, (index) {
+                final announcement = announcements[index];
+                final isFirst = index == 0;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Opacity(
+                    opacity: isFirst ? 1.0 : 0.7,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.slate900.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.slate800.withOpacity(0.6)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat(
+                              'dd MMM yyyy • HH:mm',
+                              'tr_TR',
+                            ).format(announcement.createdAt),
+                            style: const TextStyle(
+                              color: AppColors.slate500,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            announcement.notification,
+                            style: TextStyle(
+                              color: isFirst ? AppColors.slate200 : AppColors.slate400,
+                              fontSize: 14,
+                              height: 1.5,
+                              fontWeight: isFirst ? FontWeight.w500 : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
             );
           }),
         ],
       ),
     );
+  }
+
+  Future<void> _sendAnnouncement() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty || _tourId.isEmpty) return;
+
+    await _announcementController.postAnnouncementForCheckedInParticipants(_tourId, message);
+    if (mounted) {
+      setState(() {
+        _messageController.clear();
+      });
+    }
   }
 }

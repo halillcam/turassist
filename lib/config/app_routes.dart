@@ -8,6 +8,7 @@ import '../screens/auth/signup_screen.dart';
 import '../screens/chat/chat_screen.dart';
 import '../screens/city/city_choice_screen.dart';
 import '../screens/my_tours/my_tours_screen.dart';
+import '../screens/my_tours/tour_announcements_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/qr/my_qr_screen.dart';
 import '../screens/qr/qr_scanner_screen.dart';
@@ -34,6 +35,7 @@ abstract class AppRoutes {
   static const String myQrs = '/my-qrs';
   static const String profile = '/profile';
   static const String chat = '/chat';
+  static const String tourAnnouncements = '/tour-announcements';
   static const String tourManagerHome = '/tour-manager-home';
   static const String tourManagerAnnouncements = '/tour-manager-announcements';
   static const String qrScanner = '/qr-scanner';
@@ -72,7 +74,7 @@ class AppPages {
     ),
     GetPage(
       name: AppRoutes.guideDashboard,
-      page: () => Scaffold(body: Center(child: Text('Guide Dashboard Screen - Todo'))),
+      page: () => const TourManagerHomeScreen(),
       transition: Transition.fadeIn,
     ),
     GetPage(
@@ -124,6 +126,11 @@ class AppPages {
     GetPage(
       name: AppRoutes.chat,
       page: () => const ChatScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.tourAnnouncements,
+      page: () => const TourAnnouncementsScreen(),
       transition: Transition.rightToLeft,
     ),
     // Test
