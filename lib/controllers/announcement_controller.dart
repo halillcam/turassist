@@ -103,10 +103,9 @@ class AnnouncementController extends GetxController {
       isLoading.value = true;
       final newAnn = AnnouncementModel(id: '', notification: msg, createdAt: DateTime.now());
       await _firebaseService.createAnnouncement(tourId, newAnn);
-      await _firebaseService.sendNotificationToTourParticipants(tourId, msg);
       Get.snackbar(
         "Başarılı",
-        "Duyuru gönderildi. Yalnızca QR okutan katılımcılar görebilir.",
+        "Duyuru gönderildi. Bildirimler sunucu tarafından QR okutan katılımcılara iletilecek.",
         backgroundColor: AppColors.success,
         colorText: Colors.white,
       );

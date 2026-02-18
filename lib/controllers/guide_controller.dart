@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../config/colors.dart';
+import '../models/announcement_model.dart';
 import '../services/firebase_service.dart';
 
 class GuideController extends GetxController {
@@ -69,10 +70,15 @@ class GuideController extends GetxController {
   Future<void> sendNotificationToParticipants(String tourId, String message) async {
     try {
       isLoading.value = true;
-      await _firebaseService.sendNotificationToTourParticipants(tourId, message);
+      final announcement = AnnouncementModel(
+        id: '',
+        notification: message,
+        createdAt: DateTime.now(),
+      );
+      await _firebaseService.createAnnouncement(tourId, announcement);
       Get.snackbar(
         "Başarılı",
-        "Bildirim katılımcılara gönderildi.",
+        "Duyuru kaydedildi. Bildirimler QR okutan katılımcılara sunucudan gönderilecek.",
         backgroundColor: AppColors.success,
         colorText: Colors.white,
       );

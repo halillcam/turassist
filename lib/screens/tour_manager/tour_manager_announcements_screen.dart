@@ -261,7 +261,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
                 onPressed: _messageController.text.trim().isEmpty ? null : _sendAnnouncement,
                 icon: const Icon(Icons.send, size: 22),
                 label: const Text(
-                  'Tüm Katılımcılara Gönder',
+                  'QR Okutan Katılımcılara Gönder',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(

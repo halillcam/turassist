@@ -421,20 +421,29 @@ class FirebaseService {
   // Tur katılımcılarına bildirim gönder [cite: 21, 25]
   Future<void> sendNotificationToTourParticipants(String tourId, String message) async {
     try {
-      // Tüm katılımcı bileti al
+      // QR okutan katılımcı biletlerini al
       final tickets = await _firestore
           .collection('tickets')
           .where('tourId', isEqualTo: tourId)
           .where('isScanned', isEqualTo: true)
           .get();
 
-      // Her katılımcıya bildirim kaydı oluştur
-      for (var doc in tickets.docs) {
-        final userId = doc['userId'];
+      final uniqueUserIds = <String>{};
+      for (final doc in tickets.docs) {
+        final rawUserId = doc.data()['userId'];
+        final userId = rawUserId?.toString().trim() ?? '';
+        if (userId.isNotEmpty) {
+          uniqueUserIds.add(userId);
+        }
+      }
+
+      // Her kullanıcı için tek bildirim kaydı oluştur
+      for (final userId in uniqueUserIds) {
         await _firestore.collection('users').doc(userId).collection('notifications').add({
           'title': 'Tur Bildirim',
           'message': message,
           'tourId': tourId,
+          'scope': 'checked_in_only',
           'createdAt': FieldValue.serverTimestamp(),
           'isRead': false,
         });
