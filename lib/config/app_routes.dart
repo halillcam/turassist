@@ -19,6 +19,7 @@ import '../screens/tour_manager/tour_manager_announcements_screen.dart';
 import '../screens/tour_manager/tour_manager_chat_screen.dart';
 import '../screens/tour_manager/tour_manager_customers_screen.dart';
 import '../screens/tour_manager/tour_manager_home_screen.dart';
+import '../screens/tour_manager/tour_manager_login_screen.dart';
 
 /// Uygulama içi rota sabitleri.
 abstract class AppRoutes {
@@ -64,7 +65,7 @@ class AppPages {
     ),
     GetPage(
       name: AppRoutes.guideLogin,
-      page: () => Scaffold(body: Center(child: Text('Guide Login Screen - Todo'))),
+      page: () => const TourManagerLoginScreen(),
       transition: Transition.fadeIn,
     ),
     GetPage(

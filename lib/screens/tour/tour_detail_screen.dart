@@ -96,12 +96,22 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       return;
     }
 
+    final profile = await FirebaseService().getUserProfile();
+    final profileName = profile?.fullName.trim() ?? '';
+    final displayName = user.displayName?.trim() ?? '';
+    final emailFallback = (user.email ?? '').split('@').first.trim();
+    final passengerName = profileName.isNotEmpty
+        ? profileName
+        : (displayName.isNotEmpty
+              ? displayName
+              : (emailFallback.isNotEmpty ? emailFallback : 'Yolcu'));
+
     final bookingController = Get.put(BookingController());
     await bookingController.purchaseTicket(
       tourId: tour.id,
       slotId: 'test_slot',
       companyId: tour.companyId,
-      passengerName: user.displayName ?? 'Test Yolcu',
+      passengerName: passengerName,
       tcNo: '00000000000',
       price: tour.price,
       subMerchantKey: '',

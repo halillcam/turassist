@@ -120,7 +120,7 @@ class _TicketListView extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final ticket = list[index];
                   final tour = controller.ticketTours[ticket.tourId];
-                  return _buildTicketCard(ticket, tour);
+                  return _buildTicketCard(context, ticket, tour);
                 },
               ),
             );
@@ -197,14 +197,18 @@ class _TicketListView extends StatelessWidget {
     );
   }
 
-  Widget _buildTicketCard(TicketModel ticket, TourModel? tour) {
+  Widget _buildTicketCard(BuildContext context, TicketModel ticket, TourModel? tour) {
     final dateStr = DateFormat('dd MMMM yyyy', 'tr_TR').format(ticket.purchaseDate);
     final tourTitle = tour?.title ?? 'Tur';
     final companyName = tour?.guideName ?? '—';
     final isActive = ticket.status == 'active';
 
     return GestureDetector(
-      onTap: isActive ? () => controller.checkInTicket(ticket) : null,
+      onTap: isActive
+          ? () {
+              Get.toNamed(AppRoutes.myQrs, arguments: {'ticket': ticket, 'tourTitle': tourTitle});
+            }
+          : null,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -236,6 +240,15 @@ class _TicketListView extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tur ID: ${ticket.tourId}',
+                    style: const TextStyle(
+                      color: AppColors.slate500,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text(dateStr, style: const TextStyle(color: AppColors.slate300, fontSize: 12)),
                 ],
@@ -243,27 +256,53 @@ class _TicketListView extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             if (isActive)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.success,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.qr_code_scanner, color: Colors.white, size: 18),
-                    SizedBox(width: 6),
-                    Text(
-                      'Giriş Yap',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.success,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.qr_code_scanner, color: Colors.white, size: 18),
+                        SizedBox(width: 6),
+                        Text(
+                          'QR Göster',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _showCancelDialog(context, ticket),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                      ),
+                      child: const Text(
+                        'Turu İptal Et',
+                        style: TextStyle(
+                          color: AppColors.error,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               )
             else
               const Icon(Icons.qr_code_2, color: AppColors.slate500, size: 40),
@@ -271,6 +310,36 @@ class _TicketListView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _showCancelDialog(BuildContext context, TicketModel ticket) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.cardDark,
+          title: const Text('Turu İptal Et', style: TextStyle(color: Colors.white)),
+          content: const Text(
+            'Bu turu iptal etmek istediğinize emin misiniz?',
+            style: TextStyle(color: AppColors.slate300),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Vazgeç'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Evet, İptal Et', style: TextStyle(color: AppColors.error)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      await controller.cancelUpcomingTicket(ticket);
+    }
   }
 }
 

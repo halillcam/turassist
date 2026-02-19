@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../config/colors.dart';
+import '../../services/firebase_service.dart';
 
 class QrScannerScreen extends StatefulWidget {
   const QrScannerScreen({super.key});
@@ -11,13 +13,27 @@ class QrScannerScreen extends StatefulWidget {
 }
 
 class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProviderStateMixin {
+  final FirebaseService _firebaseService = FirebaseService();
+  final MobileScannerController _scannerController = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    formats: [BarcodeFormat.qrCode],
+    autoZoom: true,
+  );
+
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
+  bool _isProcessing = false;
   bool _isFlashOn = false;
+  String _tourId = '';
 
   @override
   void initState() {
     super.initState();
+    final args = Get.arguments;
+    if (args is Map<String, dynamic>) {
+      _tourId = args['tourId']?.toString() ?? '';
+    }
+
     _laserController = AnimationController(vsync: this, duration: const Duration(seconds: 2))
       ..repeat(reverse: true);
     _laserAnimation = Tween<double>(
@@ -28,8 +44,62 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
 
   @override
   void dispose() {
+    _scannerController.dispose();
     _laserController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleDetect(BarcodeCapture capture) async {
+    if (_isProcessing) return;
+
+    if (_tourId.trim().isEmpty) {
+      Get.snackbar(
+        'Tur Bulunamadı',
+        'Tarama için önce tur sorumlusuna atanmış aktif tur gerekli.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.warning,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    if (capture.barcodes.isEmpty) return;
+    final raw = (capture.barcodes.first.rawValue ?? capture.barcodes.first.displayValue ?? '')
+        .trim();
+    if (raw.isEmpty) return;
+
+    _isProcessing = true;
+
+    final result = await _firebaseService.consumeTicketByQrTokenDetailed(
+      qrToken: raw,
+      expectedTourId: _tourId,
+    );
+
+    if (!mounted) return;
+
+    if (result.success) {
+      Get.snackbar(
+        'Başarılı',
+        'QR doğrulandı, bilet girişe açıldı.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.success,
+        colorText: Colors.white,
+      );
+      Get.back(result: true);
+      return;
+    }
+
+    Get.snackbar(
+      'Geçersiz QR',
+      '[${result.code}] ${result.message}',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: AppColors.warning,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 4),
+    );
+
+    await Future.delayed(const Duration(milliseconds: 900));
+    _isProcessing = false;
   }
 
   @override
@@ -117,9 +187,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
           ),
           // Flash button
           GestureDetector(
-            onTap: () {
+            onTap: () async {
+              await _scannerController.toggleTorch();
               setState(() => _isFlashOn = !_isFlashOn);
-              // TODO: Toggle flash
             },
             child: Container(
               width: 48,
@@ -153,8 +223,20 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Spacer(flex: 2),
-        // Viewfinder
-        _buildViewfinder(),
+        // Camera + Viewfinder
+        SizedBox(
+          width: 280,
+          height: 280,
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: MobileScanner(controller: _scannerController, onDetect: _handleDetect),
+              ),
+              _buildViewfinder(),
+            ],
+          ),
+        ),
         const SizedBox(height: 40),
         // Hint text
         Container(
@@ -276,29 +358,30 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
             ),
           ),
           // Laser line (animated)
-          AnimatedBuilder(
-            animation: _laserAnimation,
-            builder: (context, child) {
-              return Positioned(
-                top: _laserAnimation.value * (size - 4),
-                left: 0,
-                right: 0,
-                child: Container(
-                  height: 2,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.6),
-                        blurRadius: 15,
-                        spreadRadius: 3,
-                      ),
-                    ],
+          if (!_isProcessing)
+            AnimatedBuilder(
+              animation: _laserAnimation,
+              builder: (context, child) {
+                return Positioned(
+                  top: _laserAnimation.value * (size - 4),
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.6),
+                          blurRadius: 15,
+                          spreadRadius: 3,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
         ],
       ),
     );

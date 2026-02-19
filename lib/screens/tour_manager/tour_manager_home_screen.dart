@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../config/colors.dart';
 import '../../services/firebase_service.dart';
@@ -52,8 +53,23 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
     _dashboardFuture = _loadDashboardData();
   }
 
+  Future<String> _resolveGuideId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isGuideSession = prefs.getBool('is_guide_session') ?? false;
+    final persistedGuideId = (prefs.getString('guide_id') ?? '').trim();
+
+    if (isGuideSession && persistedGuideId.isNotEmpty) {
+      return persistedGuideId;
+    }
+
+    final firebaseUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (firebaseUid.trim().isNotEmpty) return firebaseUid;
+
+    return persistedGuideId;
+  }
+
   Future<_GuideDashboardData> _loadDashboardData() async {
-    final guideUid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final guideUid = await _resolveGuideId();
     final guideName = await _getGuideFullName();
 
     if (guideUid.isEmpty) {
@@ -88,16 +104,30 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
   }
 
   Future<String> _getGuideFullName() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null || uid.isEmpty) return 'Tur Sorumlusu';
+    final uid = await _resolveGuideId();
+    if (uid.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedName = (prefs.getString('guide_name') ?? '').trim();
+      return cachedName.isEmpty ? 'Tur Sorumlusu' : cachedName;
+    }
 
-    // TODO: Kullanıcı/rehber veri yapısı değiştiğinde bu kaynak yeni profile endpoint'ine taşınacak.
-    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    if (!doc.exists) return 'Tur Sorumlusu';
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    if (userDoc.exists) {
+      final data = userDoc.data();
+      final fullName = data?['fullName']?.toString().trim() ?? '';
+      if (fullName.isNotEmpty) return fullName;
+    }
 
-    final data = doc.data();
-    final fullName = data?['fullName']?.toString().trim() ?? '';
-    return fullName.isEmpty ? 'Tur Sorumlusu' : fullName;
+    final guideDoc = await FirebaseFirestore.instance.collection('guides').doc(uid).get();
+    if (guideDoc.exists) {
+      final data = guideDoc.data();
+      final fullName = data?['fullName']?.toString().trim() ?? '';
+      if (fullName.isNotEmpty) return fullName;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final cachedName = (prefs.getString('guide_name') ?? '').trim();
+    return cachedName.isEmpty ? 'Tur Sorumlusu' : cachedName;
   }
 
   @override
@@ -672,6 +702,11 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
               child: OutlinedButton.icon(
                 onPressed: () {
                   Get.back();
+                  SharedPreferences.getInstance().then((prefs) async {
+                    await prefs.remove('is_guide_session');
+                    await prefs.remove('guide_id');
+                    await prefs.remove('guide_name');
+                  });
                   Get.offAllNamed('/login');
                 },
                 icon: const Icon(Icons.logout, size: 20),

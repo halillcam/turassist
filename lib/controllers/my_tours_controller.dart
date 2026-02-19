@@ -97,6 +97,60 @@ class MyToursController extends GetxController {
   List<TicketModel> get pastTickets =>
       tickets.where((t) => t.status == 'completed' || t.status == 'cancelled').toList();
 
+  Future<void> cancelUpcomingTicket(TicketModel ticket) async {
+    if (ticket.status != 'active') {
+      Get.snackbar(
+        'İptal Edilemez',
+        'Sadece aktif biletler iptal edilebilir.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.warning,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final success = await _firebaseService.updateTicketStatus(ticket.id, 'cancelled');
+    if (!success) {
+      Get.snackbar(
+        'Hata',
+        'Tur iptal işlemi başarısız oldu.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.error,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final index = tickets.indexWhere((item) => item.id == ticket.id);
+    if (index != -1) {
+      final old = tickets[index];
+      tickets[index] = TicketModel(
+        id: old.id,
+        tourId: old.tourId,
+        userId: old.userId,
+        companyId: old.companyId,
+        slotId: old.slotId,
+        passengerName: old.passengerName,
+        tcNo: old.tcNo,
+        pricePaid: old.pricePaid,
+        status: 'cancelled',
+        qrToken: old.qrToken,
+        isScanned: old.isScanned,
+        purchaseDate: old.purchaseDate,
+        scannedAt: old.scannedAt,
+      );
+      tickets.refresh();
+    }
+
+    Get.snackbar(
+      'İptal Edildi',
+      'Tur başarıyla iptal edildi.',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: AppColors.success,
+      colorText: Colors.white,
+    );
+  }
+
   /// Bilet için QR okutma simülasyonu.
   ///
   /// Biletin turunu aktif tur olarak yükler ve detay görünümüne geçer.

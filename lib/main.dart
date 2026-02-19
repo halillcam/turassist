@@ -22,8 +22,14 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final savedCity = prefs.getString('selected_city');
   final hasCity = savedCity != null && savedCity.isNotEmpty;
+  final isGuideSession = prefs.getBool('is_guide_session') ?? false;
+  final guideId = prefs.getString('guide_id') ?? '';
 
-  runApp(TurAssistApp(initialRoute: hasCity ? AppRoutes.tourList : AppRoutes.citySelection));
+  final initialRoute = (isGuideSession && guideId.isNotEmpty)
+      ? AppRoutes.guideDashboard
+      : (hasCity ? AppRoutes.tourList : AppRoutes.citySelection);
+
+  runApp(TurAssistApp(initialRoute: initialRoute));
 }
 
 class TurAssistApp extends StatelessWidget {

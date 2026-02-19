@@ -161,6 +161,10 @@ class LoginController extends GetxController {
     try {
       isLoading.value = true;
       await _googleAuthService.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('is_guide_session');
+      await prefs.remove('guide_id');
+      await prefs.remove('guide_name');
       Get.offAllNamed('/tour-list');
     } catch (e) {
       _showError('Çıkış işlemi sırasında bir sorun oluştu. Lütfen tekrar deneyin.');
@@ -182,6 +186,10 @@ class LoginController extends GetxController {
 
     switch (role) {
       case 'guide':
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('is_guide_session', true);
+        await prefs.setString('guide_id', user.uid);
+        await prefs.setString('guide_name', user.fullName);
         Get.offAllNamed(AppRoutes.guideDashboard);
         return;
 
@@ -192,8 +200,12 @@ class LoginController extends GetxController {
         return;
 
       default:
-        // customer / guest → şehir seçimi kontrol et
         final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('is_guide_session');
+        await prefs.remove('guide_id');
+        await prefs.remove('guide_name');
+
+        // customer / guest → şehir seçimi kontrol et
         final savedCity = prefs.getString('selected_city') ?? '';
 
         if (savedCity.isNotEmpty) {

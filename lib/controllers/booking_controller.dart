@@ -74,15 +74,30 @@ class BookingController extends GetxController {
         scannedAt: null,
       );
 
-      debugPrint('PURCHASE: Bilet oluşturuluyor...');
-      String ticketId = await _firebaseService.createTicket(newTicket);
+      debugPrint('PURCHASE: Bilet + QR tek adımda oluşturuluyor...');
+      final created = await _firebaseService.createTicket(newTicket);
+      final ticketId = created.ticketId;
+      final qrToken = created.qrToken;
       debugPrint('PURCHASE: Bilet oluşturuldu → ticketId=$ticketId');
+      debugPrint('PURCHASE: QR token oluşturuldu ve kaydedildi ✓');
 
-      String qrToken = await _firebaseService.generateQRToken(ticketId);
-      await _firebaseService.updateTicketQRToken(ticketId, qrToken);
-      debugPrint('PURCHASE: QR token kaydedildi ✓');
-
-      myTickets.add(newTicket);
+      myTickets.add(
+        TicketModel(
+          id: ticketId,
+          tourId: newTicket.tourId,
+          userId: newTicket.userId,
+          companyId: newTicket.companyId,
+          slotId: newTicket.slotId,
+          passengerName: newTicket.passengerName,
+          tcNo: newTicket.tcNo,
+          pricePaid: newTicket.pricePaid,
+          status: newTicket.status,
+          qrToken: qrToken,
+          isScanned: newTicket.isScanned,
+          purchaseDate: newTicket.purchaseDate,
+          scannedAt: newTicket.scannedAt,
+        ),
+      );
 
       Get.snackbar(
         'Başarılı',

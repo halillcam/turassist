@@ -1,7 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../config/app_routes.dart';
 import '../../config/colors.dart';
 import '../../services/firebase_service.dart';
 
@@ -58,7 +60,14 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
     setState(() => _isLoading = true);
 
     if (_tourId.isEmpty) {
-      final guideId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      final prefs = await SharedPreferences.getInstance();
+      final isGuideSession = prefs.getBool('is_guide_session') ?? false;
+      var guideId = (prefs.getString('guide_id') ?? '').trim();
+
+      if (!isGuideSession || guideId.isEmpty) {
+        guideId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      }
+
       if (guideId.isNotEmpty) {
         final assignedTour = await _firebaseService.getAssignedTourForGuide(guideId);
         if (assignedTour != null) {
@@ -130,6 +139,13 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
     );
   }
 
+  Future<void> _handleBack() async {
+    final didPop = await Navigator.of(context).maybePop();
+    if (!didPop) {
+      Get.offAllNamed(AppRoutes.tourManagerHome);
+    }
+  }
+
   // ── App Bar ──
   Widget _buildAppBar() {
     return Container(
@@ -139,7 +155,8 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
         children: [
           // Geri
           GestureDetector(
-            onTap: Get.back,
+            behavior: HitTestBehavior.opaque,
+            onTap: _handleBack,
             child: Container(
               width: 40,
               height: 40,

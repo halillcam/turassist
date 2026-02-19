@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -9,9 +12,50 @@ import '../models/tour_model.dart';
 import '../models/tour_program_model.dart';
 import '../models/user_model.dart';
 
+class QrConsumeResult {
+  final bool success;
+  final String code;
+  final String message;
+
+  const QrConsumeResult({required this.success, required this.code, required this.message});
+}
+
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  String _normalizeQrToken(String token) {
+    return token.trim().replaceAll('\n', '').replaceAll('\r', '').replaceAll('=', '');
+  }
+
+  Map<String, dynamic>? _decodeQrPayload(String token) {
+    try {
+      var normalized = token.trim().replaceAll('\n', '').replaceAll('\r', '');
+      final mod = normalized.length % 4;
+      if (mod != 0) {
+        normalized = normalized.padRight(normalized.length + (4 - mod), '=');
+      }
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      final payload = jsonDecode(decoded);
+      if (payload is Map<String, dynamic>) return payload;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _extractTicketIdFromToken(String token) {
+    final raw = token.trim();
+    if (raw.startsWith('tk_')) {
+      final parts = raw.split('_');
+      if (parts.length >= 3) {
+        return parts[1].trim();
+      }
+    }
+
+    final payload = _decodeQrPayload(raw);
+    return payload?['ticketId']?.toString().trim() ?? '';
+  }
 
   // ==================== TOUR OPERATIONS ====================
   // Aktif (silinmemiş) turları getirir
@@ -125,11 +169,38 @@ class FirebaseService {
           .where('tourId', isEqualTo: tourId)
           .get();
 
-      final all = snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
-      return all.where((item) {
-        final status = item['status']?.toString().toLowerCase() ?? '';
-        return status != 'cancelled';
-      }).toList();
+      final participants = await Future.wait(
+        snapshot.docs.map((doc) async {
+          final data = doc.data();
+          final status = data['status']?.toString().toLowerCase() ?? '';
+          if (status == 'cancelled') return null;
+
+          final userId = data['userId']?.toString().trim() ?? '';
+          final ticketName = data['passengerName']?.toString().trim() ?? '';
+          final tcNo = data['tcNo']?.toString().trim() ?? '';
+
+          String resolvedName = ticketName;
+          if (resolvedName.isEmpty && userId.isNotEmpty) {
+            final userDoc = await _firestore.collection('users').doc(userId).get();
+            final userData = userDoc.data();
+            final profileName = userData?['fullName']?.toString().trim() ?? '';
+            final email = userData?['email']?.toString().trim() ?? '';
+            final emailName = email.contains('@') ? email.split('@').first.trim() : '';
+
+            resolvedName = profileName.isNotEmpty
+                ? profileName
+                : (emailName.isNotEmpty ? emailName : resolvedName);
+
+            if (resolvedName.isNotEmpty) {
+              await doc.reference.update({'passengerName': resolvedName});
+            }
+          }
+
+          return {'id': doc.id, ...data, 'passengerName': resolvedName, 'tcNo': tcNo};
+        }),
+      );
+
+      return participants.whereType<Map<String, dynamic>>().toList();
     } catch (e) {
       debugPrint('Error fetching tour participants: $e');
       return [];
@@ -162,14 +233,45 @@ class FirebaseService {
 
   // ==================== TICKET & QR OPERATIONS ====================
   // Bilet oluşturma [cite: 15, 28]
-  Future<String> createTicket(TicketModel ticket) async {
+  Future<({String ticketId, String qrToken})> createTicket(TicketModel ticket) async {
     try {
       debugPrint('createTicket: userId=${ticket.userId}, tourId=${ticket.tourId}');
       debugPrint('createTicket: toJson=${ticket.toJson()}');
+
       final docRef = _firestore.collection('tickets').doc();
-      await docRef.set(ticket.toJson());
+      final tourRef = _firestore.collection('tours').doc(ticket.tourId);
+      final userRef = _firestore.collection('users').doc(ticket.userId);
+      final qrToken = await generateQRToken(
+        ticketId: docRef.id,
+        tourId: ticket.tourId,
+        userId: ticket.userId,
+      );
+
+      final payload = ticket.toJson();
+      payload['qrToken'] = qrToken;
+
+      // Kritik yol: müşteri satın alımı için önce sadece bilet kaydı garanti edilir.
+      await docRef.set(payload);
+
+      // Ek ilişki alanları (Rules izin verirse) best-effort olarak güncellenir.
+      try {
+        await tourRef.set({
+          'registeredUserIds': FieldValue.arrayUnion([ticket.userId]),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('createTicket: tour registeredUserIds güncellenemedi (izin/rules): $e');
+      }
+
+      try {
+        await userRef.set({
+          'purchasedTourIds': FieldValue.arrayUnion([ticket.tourId]),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('createTicket: user purchasedTourIds güncellenemedi (izin/rules): $e');
+      }
+
       debugPrint('createTicket: BAŞARILI → docId=${docRef.id}');
-      return docRef.id;
+      return (ticketId: docRef.id, qrToken: qrToken);
     } catch (e) {
       debugPrint('createTicket: HATA → $e');
       throw Exception("Bilet oluşturma başarısız: $e");
@@ -223,14 +325,16 @@ class FirebaseService {
   }
 
   // QR Token Gömme - Unique token oluştur [cite: 18, 32]
-  Future<String> generateQRToken(String ticketId) async {
+  Future<String> generateQRToken({
+    required String ticketId,
+    required String tourId,
+    required String userId,
+  }) async {
     try {
-      // Kombinasyon: ticketId + timestamp + random string
-      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final randomPart = DateTime.now().microsecond.toString();
-      final qrToken = '$ticketId-$timestamp-$randomPart';
-
-      return qrToken;
+      final random = Random.secure();
+      final nonce =
+          '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}${random.nextInt(1 << 32).toRadixString(36)}';
+      return 'tk_${ticketId}_$nonce';
     } catch (e) {
       debugPrint('QR Token Generation Error: $e');
       throw Exception("QR token oluşturulamadı");
@@ -243,21 +347,247 @@ class FirebaseService {
       await _firestore.collection('tickets').doc(ticketId).update({'qrToken': qrToken});
     } catch (e) {
       debugPrint('QR Token Update Error: $e');
+      throw Exception('QR token kaydedilemedi: $e');
     }
   }
 
   // Rehberin QR okutma işlemi (Security Rules uyumlu: isScanned & scannedAt)
   Future<bool> updateTicketQRStatus(String ticketId) async {
     try {
+      final ref = _firestore.collection('tickets').doc(ticketId);
+      return await _firestore.runTransaction((tx) async {
+        final snapshot = await tx.get(ref);
+        if (!snapshot.exists) return false;
+
+        final data = snapshot.data() as Map<String, dynamic>;
+        final alreadyScanned = data['isScanned'] == true;
+        final status = data['status']?.toString().toLowerCase() ?? '';
+
+        if (alreadyScanned || status == 'cancelled' || status == 'completed') {
+          return false;
+        }
+
+        tx.update(ref, {
+          'isScanned': true,
+          'status': 'checked_in',
+          'scannedAt': FieldValue.serverTimestamp(),
+          'qrToken': null,
+        });
+
+        return true;
+      });
+    } catch (e) {
+      debugPrint('QR Scan Error: $e');
+      return false;
+    }
+  }
+
+  // QR token ile bilet doğrula + tek seferlik check-in yap (eski uyumlu bool API)
+  Future<bool> consumeTicketByQrToken({
+    required String qrToken,
+    required String expectedTourId,
+  }) async {
+    final result = await consumeTicketByQrTokenDetailed(
+      qrToken: qrToken,
+      expectedTourId: expectedTourId,
+    );
+    return result.success;
+  }
+
+  // QR token ile bilet doğrula + tek seferlik check-in yap (detaylı sonuç)
+  Future<QrConsumeResult> consumeTicketByQrTokenDetailed({
+    required String qrToken,
+    required String expectedTourId,
+  }) async {
+    final normalizedToken = _normalizeQrToken(qrToken);
+    final payload = _decodeQrPayload(qrToken);
+    final payloadTicketId = _extractTicketIdFromToken(qrToken);
+    final payloadTourId = payload?['tourId']?.toString() ?? '';
+
+    if (payloadTourId.isNotEmpty && payloadTourId.trim() != expectedTourId.trim()) {
+      debugPrint(
+        'consumeTicketByQrToken: Payload tur eşleşmedi. payloadTourId=$payloadTourId expectedTourId=$expectedTourId',
+      );
+      return const QrConsumeResult(
+        success: false,
+        code: 'tour_mismatch_payload',
+        message: 'QR farklı tura ait görünüyor.',
+      );
+    }
+
+    try {
+      if (normalizedToken.isEmpty || expectedTourId.trim().isEmpty) {
+        return const QrConsumeResult(
+          success: false,
+          code: 'invalid_input',
+          message: 'QR verisi veya tur bilgisi boş.',
+        );
+      }
+
+      QuerySnapshot<Map<String, dynamic>> query = await _firestore
+          .collection('tickets')
+          .where('qrToken', isEqualTo: normalizedToken)
+          .limit(1)
+          .get();
+
+      DocumentReference<Map<String, dynamic>>? ref;
+      if (query.docs.isNotEmpty) {
+        ref = query.docs.first.reference;
+      }
+
+      if (ref == null) {
+        query = await _firestore
+            .collection('tickets')
+            .where('qrToken', isEqualTo: qrToken.trim())
+            .limit(1)
+            .get();
+
+        if (query.docs.isNotEmpty) {
+          ref = query.docs.first.reference;
+        }
+      }
+
+      if (ref == null) {
+        if (payloadTicketId.isNotEmpty) {
+          final fallbackRef = _firestore.collection('tickets').doc(payloadTicketId);
+          final doc = await fallbackRef.get();
+          if (doc.exists) {
+            ref = fallbackRef;
+          }
+        }
+      }
+
+      if (ref == null) {
+        debugPrint('consumeTicketByQrToken: Token bulunamadı');
+        return const QrConsumeResult(
+          success: false,
+          code: 'token_not_found',
+          message: 'QR token bulunamadı.',
+        );
+      }
+
+      final ticketRef = ref;
+
+      final txSuccess = await _firestore.runTransaction((tx) async {
+        final snapshot = await tx.get(ticketRef);
+        if (!snapshot.exists) return false;
+
+        final data = snapshot.data() as Map<String, dynamic>;
+        final alreadyScanned = data['isScanned'] == true;
+        final status = data['status']?.toString().toLowerCase() ?? '';
+        final tourId = data['tourId']?.toString() ?? '';
+        final tokenInDb = data['qrToken']?.toString() ?? '';
+        final normalizedInDb = _normalizeQrToken(tokenInDb);
+
+        if (tourId.trim() != expectedTourId.trim()) {
+          debugPrint(
+            'consumeTicketByQrToken: Tur eşleşmedi. ticketTourId=$tourId expectedTourId=$expectedTourId',
+          );
+          return false;
+        }
+        if (normalizedInDb != normalizedToken) {
+          debugPrint('consumeTicketByQrToken: DB token uyuşmadı');
+          return false;
+        }
+        if (alreadyScanned || status == 'cancelled' || status == 'completed') {
+          debugPrint(
+            'consumeTicketByQrToken: Bilet artık geçersiz. alreadyScanned=$alreadyScanned status=$status',
+          );
+          return false;
+        }
+
+        tx.update(ticketRef, {
+          'isScanned': true,
+          'status': 'checked_in',
+          'scannedAt': FieldValue.serverTimestamp(),
+          'qrToken': null,
+        });
+
+        return true;
+      });
+
+      if (txSuccess) {
+        return const QrConsumeResult(success: true, code: 'ok', message: 'QR doğrulandı.');
+      }
+
+      return const QrConsumeResult(
+        success: false,
+        code: 'invalid_or_used',
+        message: 'QR geçersiz, farklı tura ait veya daha önce kullanılmış.',
+      );
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        debugPrint('consumeTicketByQrToken: permission-denied, no-read fallback deneniyor');
+        return _consumeTicketByPayloadNoRead(
+          ticketId: payloadTicketId,
+          payloadTourId: payloadTourId,
+          expectedTourId: expectedTourId,
+        );
+      }
+
+      debugPrint('QR Token Consume FirebaseError: ${e.code} ${e.message}');
+      return QrConsumeResult(
+        success: false,
+        code: e.code,
+        message: 'Firebase hatası: ${e.message ?? e.code}',
+      );
+    } catch (e) {
+      debugPrint('QR Token Consume Error: $e');
+      return QrConsumeResult(
+        success: false,
+        code: 'unknown_error',
+        message: 'Beklenmeyen hata: $e',
+      );
+    }
+  }
+
+  Future<QrConsumeResult> _consumeTicketByPayloadNoRead({
+    required String ticketId,
+    required String payloadTourId,
+    required String expectedTourId,
+  }) async {
+    try {
+      if (ticketId.trim().isEmpty) {
+        return const QrConsumeResult(
+          success: false,
+          code: 'ticket_id_missing',
+          message: 'QR içinde ticketId bulunamadı.',
+        );
+      }
+      if (payloadTourId.trim().isNotEmpty && payloadTourId.trim() != expectedTourId.trim()) {
+        return const QrConsumeResult(
+          success: false,
+          code: 'tour_mismatch_payload',
+          message: 'QR farklı tura ait görünüyor.',
+        );
+      }
+
       await _firestore.collection('tickets').doc(ticketId).update({
         'isScanned': true,
         'status': 'checked_in',
         'scannedAt': FieldValue.serverTimestamp(),
+        'qrToken': null,
       });
-      return true;
+
+      return const QrConsumeResult(
+        success: true,
+        code: 'ok_no_read_fallback',
+        message: 'QR doğrulandı (fallback).',
+      );
+    } on FirebaseException catch (e) {
+      debugPrint('no-read fallback failed: ${e.code} ${e.message}');
+      return QrConsumeResult(
+        success: false,
+        code: 'fallback_${e.code}',
+        message: 'Fallback hatası: ${e.message ?? e.code}',
+      );
     } catch (e) {
-      debugPrint('QR Scan Error: $e');
-      return false;
+      debugPrint('no-read fallback error: $e');
+      return QrConsumeResult(
+        success: false,
+        code: 'fallback_unknown_error',
+        message: 'Fallback beklenmeyen hata: $e',
+      );
     }
   }
 
@@ -565,7 +895,28 @@ class FirebaseService {
         throw Exception("Şifre yanlış");
       }
 
-      return UserModel.fromFirestore(doc);
+      final fullName = data['fullName']?.toString() ?? 'Tur Sorumlusu';
+      final email = data['email']?.toString() ?? '';
+      final phone = data['phone']?.toString() ?? '';
+      final companyId = data['companyId']?.toString() ?? '';
+      final isDeleted = data['isDeleted'] == true;
+
+      return UserModel(
+        uid: doc.id,
+        fullName: fullName,
+        email: email,
+        phone: phone,
+        role: 'guide',
+        companyId: companyId,
+        registeredCompanies: List<String>.from(
+          (data['registeredCompanies'] as List?) ?? [if (companyId.trim().isNotEmpty) companyId],
+        ),
+        tcNo: data['tcNo']?.toString() ?? '',
+        selectedCity: data['selectedCity']?.toString() ?? '',
+        profileImage: data['profileImage']?.toString(),
+        isDeleted: isDeleted,
+        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      );
     } catch (e) {
       debugPrint('Guide Login Error: $e');
       throw Exception(e.toString());
