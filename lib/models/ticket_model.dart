@@ -4,16 +4,17 @@ class TicketModel {
   final String id;
   final String tourId;
   final String userId;
-  final String companyId; // Eklendi: Security rules için şart
-  final String slotId; // Eklendi: Hangi tarihteki tur olduğu bilgisi
+  final String companyId;
+  final String slotId; // Çıkış tarihi formatı: yyyy-MM-dd
   final String passengerName;
   final String tcNo;
   final double pricePaid;
   final String status; // 'active', 'checked_in', 'completed', 'cancelled'
-  final String? qrToken; // 'qrCode' -> 'qrToken' olarak güncellendi (Rules uyumu)
-  final bool isScanned; // 'qrScanned' -> 'isScanned' olarak güncellendi
+  final String? qrToken;
+  final bool isScanned;
   final DateTime purchaseDate;
-  final DateTime? scannedAt; // 'scanDate' -> 'scannedAt' (Rules uyumu)
+  final DateTime? scannedAt;
+  final DateTime? departureDate; // Seçilen çıkış tarihi
 
   TicketModel({
     required this.id,
@@ -29,6 +30,7 @@ class TicketModel {
     required this.isScanned,
     required this.purchaseDate,
     this.scannedAt,
+    this.departureDate,
   });
 
   factory TicketModel.fromFirestore(DocumentSnapshot doc) {
@@ -37,16 +39,17 @@ class TicketModel {
       id: doc.id,
       tourId: data['tourId'] ?? '',
       userId: data['userId'] ?? '',
-      companyId: data['companyId'] ?? '', //
-      slotId: data['slotId'] ?? '', //
+      companyId: data['companyId'] ?? '',
+      slotId: data['slotId'] ?? '',
       passengerName: data['passengerName'] ?? '',
       tcNo: data['tcNo'] ?? '',
       pricePaid: (data['pricePaid'] ?? 0).toDouble(),
       status: data['status'] ?? 'active',
-      qrToken: data['qrToken'], //
-      isScanned: data['isScanned'] ?? false, //
+      qrToken: data['qrToken'],
+      isScanned: data['isScanned'] ?? false,
       purchaseDate: (data['purchaseDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      scannedAt: (data['scannedAt'] as Timestamp?)?.toDate(), //
+      scannedAt: (data['scannedAt'] as Timestamp?)?.toDate(),
+      departureDate: (data['departureDate'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -64,6 +67,7 @@ class TicketModel {
       'isScanned': isScanned,
       'purchaseDate': Timestamp.fromDate(purchaseDate),
       'scannedAt': scannedAt != null ? Timestamp.fromDate(scannedAt!) : null,
+      'departureDate': departureDate != null ? Timestamp.fromDate(departureDate!) : null,
     };
   }
 }

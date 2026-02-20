@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
 import '../../config/app_routes.dart';
 import '../../config/colors.dart';
@@ -96,6 +97,13 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       return;
     }
 
+    // ── Çıkış günü seçimi ──
+    DateTime? selectedDate;
+    if (tour.departureDays.isNotEmpty) {
+      selectedDate = await _showDepartureDatePicker(tour);
+      if (selectedDate == null) return; // İptal edildi
+    }
+
     final profile = await FirebaseService().getUserProfile();
     final profileName = profile?.fullName.trim() ?? '';
     final displayName = user.displayName?.trim() ?? '';
@@ -106,15 +114,20 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               ? displayName
               : (emailFallback.isNotEmpty ? emailFallback : 'Yolcu'));
 
+    final slotId = selectedDate != null
+        ? DateFormat('yyyy-MM-dd').format(selectedDate)
+        : 'no_schedule';
+
     final bookingController = Get.put(BookingController());
     await bookingController.purchaseTicket(
       tourId: tour.id,
-      slotId: 'test_slot',
+      slotId: slotId,
       companyId: tour.companyId,
       passengerName: passengerName,
       tcNo: '00000000000',
       price: tour.price,
       subMerchantKey: '',
+      departureDate: selectedDate,
     );
 
     // MyToursController'u sil ki yeniden oluşturulup loadData çağrılsın
@@ -124,6 +137,158 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
     // Turlarım sayfasına yönlendir
     Get.offNamed(AppRoutes.myTours);
+  }
+
+  /// Yakın çıkış tarihlerini gösteren bottom sheet. Kalan kapasite bilgisiyle.
+  Future<DateTime?> _showDepartureDatePicker(TourModel tour) async {
+    final upcoming = tour.getUpcomingDepartures(count: 8);
+    if (upcoming.isEmpty) return null;
+
+    // Slot doluluk bilgilerini çek
+    final slotIds = upcoming.map((d) => DateFormat('yyyy-MM-dd').format(d)).toList();
+    final counts = await FirebaseService().getSlotTicketCounts(tour.id, slotIds);
+
+    if (!mounted) return null;
+
+    return showModalBottomSheet<DateTime>(
+      context: context,
+      backgroundColor: AppColors.cardDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle bar
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.slate500,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Çıkış Tarihi Seçin',
+                    style: TextStyle(
+                      color: AppColors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (tour.departureTime.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Kalkış saati: ${tour.departureTime}',
+                      style: const TextStyle(color: AppColors.slate400, fontSize: 13),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  ...upcoming.map((date) {
+                    final sid = DateFormat('yyyy-MM-dd').format(date);
+                    final sold = counts[sid] ?? 0;
+                    final remaining = tour.capacity - sold;
+                    final isFull = remaining <= 0;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: isFull ? null : () => Navigator.of(ctx).pop(date),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: isFull
+                                  ? AppColors.slate800.withOpacity(0.5)
+                                  : AppColors.slate800,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isFull
+                                    ? AppColors.slate700
+                                    : AppColors.primary.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today,
+                                  color: isFull ? AppColors.slate600 : AppColors.primary,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Flexible(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _formatDateTurkish(date),
+                                        style: TextStyle(
+                                          color: isFull ? AppColors.slate500 : AppColors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        isFull ? 'Dolu' : '$remaining kişilik yer mevcut',
+                                        style: TextStyle(
+                                          color: isFull ? AppColors.error : AppColors.slate400,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (!isFull)
+                                  const Icon(
+                                    Icons.chevron_right,
+                                    color: AppColors.slate400,
+                                    size: 20,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Tarih formatlama: "Pazartesi, 14 Temmuz 2025"
+  String _formatDateTurkish(DateTime date) {
+    const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+    const months = [
+      'Ocak',
+      'Şubat',
+      'Mart',
+      'Nisan',
+      'Mayıs',
+      'Haziran',
+      'Temmuz',
+      'Ağustos',
+      'Eylül',
+      'Ekim',
+      'Kasım',
+      'Aralık',
+    ];
+    return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   Widget _buildHeroImage(TourModel tour) {
@@ -278,6 +443,40 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   ),
                 ],
               ),
+
+              // Çıkış günleri bilgisi
+              if (tour.departureDays.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Container(height: 1, color: AppColors.slate800),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_month, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Çıkış günleri: ${tour.departureDaysText}',
+                      style: const TextStyle(
+                        color: AppColors.slate300,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (tour.departureTime.isNotEmpty) ...[
+                      const Spacer(),
+                      Icon(Icons.access_time, color: AppColors.primary, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        tour.departureTime,
+                        style: const TextStyle(
+                          color: AppColors.slate300,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
             ],
           ),
         ),

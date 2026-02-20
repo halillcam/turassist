@@ -32,10 +32,24 @@ class _TestTourScreenState extends State<TestTourScreen> {
   final _plateController = TextEditingController();
   final _busCapacityController = TextEditingController();
 
+  // Departure
+  final _departureTimeController = TextEditingController();
+  final Set<int> _selectedDepartureDays = {};
+
   // State
   bool _isLoading = false;
   String _selectedRegion = 'Marmara';
   final List<String> _logMessages = [];
+
+  static const _weekDayLabels = {
+    1: 'Pzt',
+    2: 'Sal',
+    3: 'Çar',
+    4: 'Per',
+    5: 'Cum',
+    6: 'Cmt',
+    7: 'Paz',
+  };
 
   // Tur Programı - Dinamik günler ve aktiviteler
   // Her eleman: { 'title': TextEditingController, 'activities': [TextEditingController, ...] }
@@ -66,6 +80,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
     _driverPhoneController.dispose();
     _plateController.dispose();
     _busCapacityController.dispose();
+    _departureTimeController.dispose();
     // Program controller'larını dispose et
     for (final day in _programDays) {
       (day['title'] as TextEditingController).dispose();
@@ -169,6 +184,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: _selectedDepartureDays.toList()..sort(),
+        departureTime: _departureTimeController.text.trim(),
       );
 
       final docId = await _service.addTour(tour);
@@ -242,6 +259,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [1, 3, 5], // Pzt, Çar, Cum
+        departureTime: '09:00',
       ),
       TourModel(
         id: '',
@@ -265,6 +284,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [6, 7], // Cmt, Paz
+        departureTime: '06:00',
       ),
       TourModel(
         id: '',
@@ -288,6 +309,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [2, 4, 6], // Sal, Per, Cmt
+        departureTime: '08:30',
       ),
       TourModel(
         id: '',
@@ -311,6 +334,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [1, 2, 3, 4, 5, 6, 7], // Her gün
+        departureTime: '10:00',
       ),
       TourModel(
         id: '',
@@ -333,6 +358,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [5, 6], // Cum, Cmt
+        departureTime: '07:00',
       ),
       TourModel(
         id: '',
@@ -356,6 +383,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [3, 7], // Çar, Paz
+        departureTime: '08:00',
       ),
       TourModel(
         id: '',
@@ -378,6 +407,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [6], // Cmt
+        departureTime: '04:00',
       ),
       TourModel(
         id: '',
@@ -400,6 +431,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [6, 7], // Cmt, Paz
+        departureTime: '09:30',
       ),
       TourModel(
         id: '',
@@ -422,6 +455,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [1], // Pzt
+        departureTime: '11:00',
       ),
       TourModel(
         id: '',
@@ -444,6 +479,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
+        departureDays: [4, 5], // Per, Cum
+        departureTime: '07:30',
       ),
     ];
 
@@ -539,6 +576,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
       }
     }
     _programDays.clear();
+    _departureTimeController.clear();
+    _selectedDepartureDays.clear();
     setState(() => _selectedRegion = 'Marmara');
   }
 
@@ -678,6 +717,17 @@ class _TestTourScreenState extends State<TestTourScreen> {
                           controller: _guideNameController,
                           label: 'Rehber Adı (Opsiyonel)',
                           icon: Icons.person,
+                        ),
+
+                        const SizedBox(height: 20),
+                        _buildSectionTitle('Çıkış Takvimi'),
+                        const SizedBox(height: 8),
+                        _buildDepartureDaysSelector(),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _departureTimeController,
+                          label: 'Çıkış Saati (ör: 09:00)',
+                          icon: Icons.access_time,
                         ),
 
                         const SizedBox(height: 20),
@@ -1007,6 +1057,89 @@ class _TestTourScreenState extends State<TestTourScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDepartureDaysSelector() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.slate800,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.slate700),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.calendar_month, color: AppColors.slate500, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Haftalık Çıkış Günleri',
+                style: TextStyle(color: AppColors.slate400, fontSize: 14),
+              ),
+              const Spacer(),
+              if (_selectedDepartureDays.isNotEmpty)
+                GestureDetector(
+                  onTap: () => setState(() => _selectedDepartureDays.clear()),
+                  child: const Text(
+                    'Temizle',
+                    style: TextStyle(color: AppColors.error, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _weekDayLabels.entries.map((entry) {
+              final dayNum = entry.key;
+              final label = entry.value;
+              final isSelected = _selectedDepartureDays.contains(dayNum);
+
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (isSelected) {
+                      _selectedDepartureDays.remove(dayNum);
+                    } else {
+                      _selectedDepartureDays.add(dayNum);
+                    }
+                  });
+                },
+                child: Container(
+                  width: 44,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : AppColors.slate900,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isSelected ? AppColors.primary : AppColors.slate600),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.slate400,
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          if (_selectedDepartureDays.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Boş bırakılırsa takvim ayarlanmamış olur',
+                style: TextStyle(color: AppColors.slate500, fontSize: 11),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

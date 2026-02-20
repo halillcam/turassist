@@ -93,9 +93,24 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
     }
 
     final participants = await _firebaseService.getTourParticipants(assignedTour.id);
+
+    // Bugünün slot ID'si
+    final now = DateTime.now();
+    final todaySlot =
+        '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+
     final activeParticipants = participants.where((item) {
       final status = item['status']?.toString().toLowerCase() ?? '';
-      return status != 'cancelled';
+      if (status == 'cancelled') return false;
+
+      // Eğer bilet tarihli slotId'ye sahipse, sadece bugünün yolcularını göster
+      final slotId = item['slotId']?.toString() ?? '';
+      final isDateSlot = RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(slotId);
+      if (isDateSlot && slotId != todaySlot) return false;
+
+      return true;
     }).toList();
 
     final totalCount = activeParticipants.length;

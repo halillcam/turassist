@@ -38,6 +38,7 @@ class BookingController extends GetxController {
     required String tcNo,
     required double price,
     required String subMerchantKey,
+    DateTime? departureDate,
   }) async {
     try {
       isLoading.value = true;
@@ -45,7 +46,7 @@ class BookingController extends GetxController {
       final userId = _firebaseService.getCurrentUserId();
       debugPrint('═══ PURCHASE: Başladı ═══');
       debugPrint('PURCHASE: userId=$userId');
-      debugPrint('PURCHASE: tourId=$tourId');
+      debugPrint('PURCHASE: tourId=$tourId, slotId=$slotId');
 
       if (userId.isEmpty) {
         debugPrint('PURCHASE: HATA — userId boş! Kullanıcı giriş yapmamış.');
@@ -72,6 +73,7 @@ class BookingController extends GetxController {
         isScanned: false,
         purchaseDate: DateTime.now(),
         scannedAt: null,
+        departureDate: departureDate,
       );
 
       debugPrint('PURCHASE: Bilet + QR tek adımda oluşturuluyor...');
@@ -96,6 +98,7 @@ class BookingController extends GetxController {
           isScanned: newTicket.isScanned,
           purchaseDate: newTicket.purchaseDate,
           scannedAt: newTicket.scannedAt,
+          departureDate: newTicket.departureDate,
         ),
       );
 

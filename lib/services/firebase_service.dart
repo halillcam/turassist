@@ -63,6 +63,21 @@ class FirebaseService {
     return payload?['ticketId']?.toString().trim() ?? '';
   }
 
+  /// slotId'nin yyyy-MM-dd formatında bir tarih olup olmadığını kontrol eder.
+  bool _isDateSlotId(String slotId) {
+    if (slotId.length != 10) return false;
+    final regex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+    return regex.hasMatch(slotId);
+  }
+
+  /// Bugünün slotId formatı: yyyy-MM-dd
+  String _todaySlotId() {
+    final now = DateTime.now();
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+  }
+
   // ==================== TOUR OPERATIONS ====================
   // Aktif (silinmemiş) turları getirir
   Future<List<TourModel>> getActiveTours() async {
@@ -238,6 +253,53 @@ class FirebaseService {
   }
 
   // ==================== TICKET & QR OPERATIONS ====================
+
+  /// Belirli bir tur + slot (tarih) için satılmış aktif bilet sayısını döndürür.
+  /// İptal edilmiş biletler sayılmaz.
+  Future<int> getSlotTicketCount(String tourId, String slotId) async {
+    try {
+      final snap = await _firestore
+          .collection('tickets')
+          .where('tourId', isEqualTo: tourId)
+          .where('slotId', isEqualTo: slotId)
+          .where('status', whereIn: ['active', 'checked_in'])
+          .get();
+      return snap.docs.length;
+    } catch (e) {
+      debugPrint('getSlotTicketCount HATA: $e');
+      return 0;
+    }
+  }
+
+  /// Birden fazla slot için toplu kapasite sorgulama.
+  /// Dönen map: slotId → satılmış bilet sayısı.
+  Future<Map<String, int>> getSlotTicketCounts(String tourId, List<String> slotIds) async {
+    final result = <String, int>{};
+    // Firestore 'in' sorgusu max 10 değer alır, parçalar halinde sorgula
+    // NOT: Tek sorguda sadece bir `whereIn` kullanılabilir, bu yüzden status
+    // filtrelemesi client-side yapılır.
+    for (var i = 0; i < slotIds.length; i += 10) {
+      final chunk = slotIds.sublist(i, i + 10 > slotIds.length ? slotIds.length : i + 10);
+      try {
+        final snap = await _firestore
+            .collection('tickets')
+            .where('tourId', isEqualTo: tourId)
+            .where('slotId', whereIn: chunk)
+            .get();
+        for (final doc in snap.docs) {
+          final data = doc.data();
+          final status = data['status']?.toString().toLowerCase() ?? '';
+          if (status == 'cancelled' || status == 'completed') continue;
+          final sid = data['slotId']?.toString() ?? '';
+          result[sid] = (result[sid] ?? 0) + 1;
+        }
+      } catch (e) {
+        debugPrint('getSlotTicketCounts HATA (chunk $i): $e');
+      }
+    }
+    return result;
+  }
+
   // Bilet oluşturma [cite: 15, 28]
   Future<({String ticketId, String qrToken})> createTicket(TicketModel ticket) async {
     try {
@@ -460,9 +522,10 @@ class FirebaseService {
             final tokenInDb = data['qrToken']?.toString() ?? '';
             final normalizedInDb = _normalizeQrToken(tokenInDb);
             final pName = data['passengerName']?.toString() ?? '';
+            final slotId = data['slotId']?.toString() ?? '';
 
             debugPrint(
-              'consumeTicket: DB tourId=$tourId, tokenInDb=$tokenInDb, isScanned=$alreadyScanned, status=$status, passenger=$pName',
+              'consumeTicket: DB tourId=$tourId, tokenInDb=$tokenInDb, isScanned=$alreadyScanned, status=$status, passenger=$pName, slotId=$slotId',
             );
 
             if (tourId.trim() != expectedTourId.trim()) {
@@ -484,6 +547,15 @@ class FirebaseService {
               return null;
             }
 
+            // ── Tarih doğrulama: slotId yyyy-MM-dd formatındaysa bugünle karşılaştır ──
+            if (_isDateSlotId(slotId)) {
+              final today = _todaySlotId();
+              if (slotId != today) {
+                debugPrint('consumeTicket: Tarih uyuşmazlığı! slotId=$slotId today=$today');
+                return '__DATE_MISMATCH__$slotId';
+              }
+            }
+
             tx.update(directRef, {
               'isScanned': true,
               'status': 'checked_in',
@@ -494,6 +566,18 @@ class FirebaseService {
           });
 
           if (txPassengerName != null) {
+            // Tarih uyuşmazlığı sentinel kontrolü
+            if (txPassengerName.startsWith('__DATE_MISMATCH__')) {
+              final ticketSlot = txPassengerName.replaceFirst('__DATE_MISMATCH__', '');
+              debugPrint(
+                'consumeTicket: Tarih uyuşmazlığı — bilet=$ticketSlot bugün=${_todaySlotId()}',
+              );
+              return QrConsumeResult(
+                success: false,
+                code: 'date_mismatch',
+                message: 'Bu bilet $ticketSlot tarihli çıkış için geçerli. Bugün okutamazsınız.',
+              );
+            }
             debugPrint('consumeTicket: Strateji 1 BAŞARILI ✓ passenger=$txPassengerName');
             return QrConsumeResult(
               success: true,
@@ -563,6 +647,7 @@ class FirebaseService {
         final status = data['status']?.toString().toLowerCase() ?? '';
         final tourId = data['tourId']?.toString() ?? '';
         final pName = data['passengerName']?.toString() ?? '';
+        final slotId = data['slotId']?.toString() ?? '';
 
         if (tourId.trim() != expectedTourId.trim()) {
           debugPrint('consumeTicket: Tur eşleşmedi (sorgu yolu). ticketTourId=$tourId');
@@ -571,6 +656,17 @@ class FirebaseService {
         if (alreadyScanned || status == 'cancelled' || status == 'completed') {
           debugPrint('consumeTicket: Bilet artık geçersiz (sorgu yolu).');
           return null;
+        }
+
+        // ── Tarih doğrulama ──
+        if (_isDateSlotId(slotId)) {
+          final today = _todaySlotId();
+          if (slotId != today) {
+            debugPrint(
+              'consumeTicket: Tarih uyuşmazlığı (sorgu yolu)! slotId=$slotId today=$today',
+            );
+            return '__DATE_MISMATCH__$slotId';
+          }
         }
 
         tx.update(ticketRef, {
@@ -583,6 +679,15 @@ class FirebaseService {
       });
 
       if (txPassengerName2 != null) {
+        // Tarih uyuşmazlığı sentinel kontrolü
+        if (txPassengerName2.startsWith('__DATE_MISMATCH__')) {
+          final ticketSlot = txPassengerName2.replaceFirst('__DATE_MISMATCH__', '');
+          return QrConsumeResult(
+            success: false,
+            code: 'date_mismatch',
+            message: 'Bu bilet $ticketSlot tarihli çıkış için geçerli. Bugün okutamazsınız.',
+          );
+        }
         debugPrint('consumeTicket: Strateji 2 BAŞARILI ✓ passenger=$txPassengerName2');
         return QrConsumeResult(
           success: true,

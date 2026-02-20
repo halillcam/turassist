@@ -204,6 +204,12 @@ class _TicketListView extends StatelessWidget {
     final companyName = tour?.guideName ?? '—';
     final isActive = ticket.status == 'active';
 
+    // Çıkış tarihi bilgisi
+    String? departureDateStr;
+    if (ticket.departureDate != null) {
+      departureDateStr = DateFormat('dd MMMM yyyy, EEEE', 'tr_TR').format(ticket.departureDate!);
+    }
+
     return GestureDetector(
       onTap: isActive
           ? () {
@@ -241,17 +247,30 @@ class _TicketListView extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                  if (departureDateStr != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, color: AppColors.primary, size: 13),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Çıkış: $departureDateStr',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 2),
                   Text(
-                    'Tur ID: ${ticket.tourId}',
-                    style: const TextStyle(
-                      color: AppColors.slate500,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    'Satın alım: $dateStr',
+                    style: const TextStyle(color: AppColors.slate300, fontSize: 12),
                   ),
-                  const SizedBox(height: 4),
-                  Text(dateStr, style: const TextStyle(color: AppColors.slate300, fontSize: 12)),
                 ],
               ),
             ),
