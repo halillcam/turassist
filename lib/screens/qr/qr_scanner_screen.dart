@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -68,6 +69,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
         .trim();
     if (raw.isEmpty) return;
 
+    debugPrint('QR_SCANNER: Ham QR verisi okundu → "$raw"');
+    debugPrint('QR_SCANNER: Beklenen tourId → "$_tourId"');
+
     _isProcessing = true;
 
     final result = await _firebaseService.consumeTicketByQrTokenDetailed(
@@ -75,17 +79,25 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
       expectedTourId: _tourId,
     );
 
+    debugPrint(
+      'QR_SCANNER: Sonuç → success=${result.success}, code=${result.code}, msg=${result.message}',
+    );
+
     if (!mounted) return;
 
     if (result.success) {
+      final name = result.passengerName.isNotEmpty ? result.passengerName : 'Yolcu';
+      // Önce snackbar göster, sonra sayfayı kapat
       Get.snackbar(
-        'Başarılı',
-        'QR doğrulandı, bilet girişe açıldı.',
+        'Başarılı ✓',
+        '$name — QR doğrulandı, bilet girişe açıldı.',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: AppColors.success,
         colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
-      Get.back(result: true);
+      await Future.delayed(const Duration(milliseconds: 1200));
+      if (mounted) Get.back(result: true);
       return;
     }
 

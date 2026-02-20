@@ -41,7 +41,8 @@ class MyToursScreen extends StatelessWidget {
           }
 
           // checked_in durumu → Aktif Tur Detayları ekranı
-          if (controller.hasCheckedIn && controller.activeTour.value != null) {
+          // (activeTour null olsa bile _ActiveTourDetailView spinner gösterir)
+          if (controller.hasCheckedIn) {
             return _ActiveTourDetailView(controller: controller);
           }
 

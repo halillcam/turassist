@@ -45,12 +45,23 @@ class _GuideDashboardData {
 
 class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  late final Future<_GuideDashboardData> _dashboardFuture;
+  Future<_GuideDashboardData> _dashboardFuture = Future.value(
+    const _GuideDashboardData(guideName: 'Tur Sorumlusu'),
+  );
 
   @override
   void initState() {
     super.initState();
     _dashboardFuture = _loadDashboardData();
+  }
+
+  /// Dashboard verilerini yeniden yükler (pull-to-refresh & QR sonrası).
+  Future<void> _refreshDashboard() async {
+    final fresh = _loadDashboardData();
+    setState(() {
+      _dashboardFuture = fresh;
+    });
+    await fresh;
   }
 
   Future<String> _resolveGuideId() async {
@@ -140,39 +151,44 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
         return Scaffold(
           backgroundColor: AppColors.backgroundDark,
           body: SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(dashboard.guideName),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 16),
-                        _buildTourTitle(dashboard.tourTitle),
-                        const SizedBox(height: 16),
-                        _buildStatCards(
-                          dashboard.totalParticipants,
-                          dashboard.checkedInParticipants,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildProgressCard(dashboard.pendingParticipants, dashboard.progress),
-                        const SizedBox(height: 24),
-                        _buildScanButton(dashboard.tourId, dashboard.tourTitle),
-                        const SizedBox(height: 28),
-                        _buildManagementTools(
-                          tourId: dashboard.tourId,
-                          tourTitle: dashboard.tourTitle,
-                          checkedInCount: dashboard.checkedInParticipants,
-                          pendingCount: dashboard.pendingParticipants,
-                        ),
-                        const SizedBox(height: 24),
-                      ],
+            child: RefreshIndicator(
+              onRefresh: _refreshDashboard,
+              color: AppColors.primary,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(dashboard.guideName),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 16),
+                          _buildTourTitle(dashboard.tourTitle),
+                          const SizedBox(height: 16),
+                          _buildStatCards(
+                            dashboard.totalParticipants,
+                            dashboard.checkedInParticipants,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildProgressCard(dashboard.pendingParticipants, dashboard.progress),
+                          const SizedBox(height: 24),
+                          _buildScanButton(dashboard.tourId, dashboard.tourTitle),
+                          const SizedBox(height: 28),
+                          _buildManagementTools(
+                            tourId: dashboard.tourId,
+                            tourTitle: dashboard.tourTitle,
+                            checkedInCount: dashboard.checkedInParticipants,
+                            pendingCount: dashboard.pendingParticipants,
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -428,8 +444,15 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
       child: ElevatedButton.icon(
         onPressed: tourId.trim().isEmpty
             ? null
-            : () {
-                Get.toNamed('/qr-scanner', arguments: {'tourId': tourId, 'tourTitle': tourTitle});
+            : () async {
+                final result = await Get.toNamed(
+                  '/qr-scanner',
+                  arguments: {'tourId': tourId, 'tourTitle': tourTitle},
+                );
+                // QR başarılıysa dashboard'u yenile
+                if (result == true) {
+                  _refreshDashboard();
+                }
               },
         icon: const Icon(Icons.qr_code_scanner, size: 28),
         label: const Text(

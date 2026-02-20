@@ -1,15 +1,31 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../config/app_routes.dart';
 import '../../config/colors.dart';
+import '../../controllers/my_tours_controller.dart';
 import '../../models/ticket_model.dart';
 
-class MyQrScreen extends StatelessWidget {
+class MyQrScreen extends StatefulWidget {
   const MyQrScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<MyQrScreen> createState() => _MyQrScreenState();
+}
+
+class _MyQrScreenState extends State<MyQrScreen> {
+  StreamSubscription<DocumentSnapshot>? _ticketSub;
+  bool _navigated = false;
+  late final TicketModel? _ticket;
+  late final String _tourTitle;
+
+  @override
+  void initState() {
+    super.initState();
     final args = Get.arguments;
     TicketModel? ticket;
     String tourTitle = 'Tur Bileti';
@@ -21,6 +37,50 @@ class MyQrScreen extends StatelessWidget {
       }
       tourTitle = args['tourTitle']?.toString() ?? tourTitle;
     }
+
+    _ticket = ticket;
+    _tourTitle = tourTitle;
+
+    // Bilet belgesini gerçek zamanlı dinle — rehber QR okuttuğunda
+    // isScanned true olur ve kullanıcı otomatik aktif tur ekranına yönlendirilir.
+    if (ticket != null && ticket.id.isNotEmpty) {
+      _ticketSub = FirebaseFirestore.instance
+          .collection('tickets')
+          .doc(ticket.id)
+          .snapshots()
+          .listen((snapshot) {
+            if (!mounted || _navigated) return;
+            final data = snapshot.data();
+            if (data == null) return;
+
+            final isScanned = data['isScanned'] == true;
+            final status = data['status']?.toString() ?? '';
+
+            if (isScanned || status == 'checked_in') {
+              _navigated = true;
+              _ticketSub?.cancel();
+
+              // MyToursController'ı sıfırla ki yeni veriyi yüklesin
+              if (Get.isRegistered<MyToursController>()) {
+                Get.delete<MyToursController>();
+              }
+
+              Get.offNamed(AppRoutes.myTours);
+            }
+          });
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticketSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ticket = _ticket;
+    final tourTitle = _tourTitle;
 
     final qrToken = ticket?.qrToken;
     final isScanned = ticket?.isScanned == true;

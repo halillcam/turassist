@@ -16,8 +16,14 @@ class QrConsumeResult {
   final bool success;
   final String code;
   final String message;
+  final String passengerName;
 
-  const QrConsumeResult({required this.success, required this.code, required this.message});
+  const QrConsumeResult({
+    required this.success,
+    required this.code,
+    required this.message,
+    this.passengerName = '',
+  });
 }
 
 class FirebaseService {
@@ -25,7 +31,7 @@ class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   String _normalizeQrToken(String token) {
-    return token.trim().replaceAll('\n', '').replaceAll('\r', '').replaceAll('=', '');
+    return token.trim().replaceAll('\n', '').replaceAll('\r', '');
   }
 
   Map<String, dynamic>? _decodeQrPayload(String token) {
@@ -324,6 +330,23 @@ class FirebaseService {
     }
   }
 
+  /// Kullanıcının biletlerini gerçek zamanlı dinler.
+  ///
+  /// QR tarama sonrası `isScanned` / `status` değişikliklerini
+  /// anında UI'a yansıtmak için kullanılır.
+  Stream<List<TicketModel>> getUserTicketsStream() {
+    final userId = _auth.currentUser?.uid ?? '';
+    if (userId.isEmpty) return const Stream.empty();
+
+    return _firestore.collection('tickets').where('userId', isEqualTo: userId).snapshots().map((
+      snapshot,
+    ) {
+      final tickets = snapshot.docs.map(TicketModel.fromFirestore).toList();
+      tickets.sort((a, b) => b.purchaseDate.compareTo(a.purchaseDate));
+      return tickets;
+    });
+  }
+
   // QR Token Gömme - Unique token oluştur [cite: 18, 32]
   Future<String> generateQRToken({
     required String ticketId,
@@ -400,20 +423,11 @@ class FirebaseService {
     required String expectedTourId,
   }) async {
     final normalizedToken = _normalizeQrToken(qrToken);
-    final payload = _decodeQrPayload(qrToken);
     final payloadTicketId = _extractTicketIdFromToken(qrToken);
-    final payloadTourId = payload?['tourId']?.toString() ?? '';
 
-    if (payloadTourId.isNotEmpty && payloadTourId.trim() != expectedTourId.trim()) {
-      debugPrint(
-        'consumeTicketByQrToken: Payload tur eşleşmedi. payloadTourId=$payloadTourId expectedTourId=$expectedTourId',
-      );
-      return const QrConsumeResult(
-        success: false,
-        code: 'tour_mismatch_payload',
-        message: 'QR farklı tura ait görünüyor.',
-      );
-    }
+    debugPrint('consumeTicket: normalizedToken=$normalizedToken');
+    debugPrint('consumeTicket: payloadTicketId=$payloadTicketId');
+    debugPrint('consumeTicket: expectedTourId=$expectedTourId');
 
     try {
       if (normalizedToken.isEmpty || expectedTourId.trim().isEmpty) {
@@ -424,6 +438,89 @@ class FirebaseService {
         );
       }
 
+      // ── STRATEJİ 1: Token'dan ticketId çıkararak doğrudan belge erişimi ──
+      // Firestore Security Rules rehberin koleksiyonu sorgulamasını engellese bile
+      // tek belge erişimi genelde izinlidir veya fallback ile güncellenebilir.
+      if (payloadTicketId.isNotEmpty) {
+        debugPrint('consumeTicket: Strateji 1 — doğrudan ticketId ile erişim: $payloadTicketId');
+        try {
+          final directRef = _firestore.collection('tickets').doc(payloadTicketId);
+          // Transaction String? döndürür: null = başarısız, non-null = yolcu adı
+          final txPassengerName = await _firestore.runTransaction<String?>((tx) async {
+            final snapshot = await tx.get(directRef);
+            if (!snapshot.exists) {
+              debugPrint('consumeTicket: ticketId=$payloadTicketId bulunamadı');
+              return null;
+            }
+
+            final data = snapshot.data() as Map<String, dynamic>;
+            final alreadyScanned = data['isScanned'] == true;
+            final status = data['status']?.toString().toLowerCase() ?? '';
+            final tourId = data['tourId']?.toString() ?? '';
+            final tokenInDb = data['qrToken']?.toString() ?? '';
+            final normalizedInDb = _normalizeQrToken(tokenInDb);
+            final pName = data['passengerName']?.toString() ?? '';
+
+            debugPrint(
+              'consumeTicket: DB tourId=$tourId, tokenInDb=$tokenInDb, isScanned=$alreadyScanned, status=$status, passenger=$pName',
+            );
+
+            if (tourId.trim() != expectedTourId.trim()) {
+              debugPrint(
+                'consumeTicket: Tur eşleşmedi. ticketTourId=$tourId expectedTourId=$expectedTourId',
+              );
+              return null;
+            }
+            if (normalizedInDb != normalizedToken) {
+              debugPrint(
+                'consumeTicket: DB token uyuşmadı. normalizedInDb=$normalizedInDb normalizedToken=$normalizedToken',
+              );
+              return null;
+            }
+            if (alreadyScanned || status == 'cancelled' || status == 'completed') {
+              debugPrint(
+                'consumeTicket: Bilet artık geçersiz. alreadyScanned=$alreadyScanned status=$status',
+              );
+              return null;
+            }
+
+            tx.update(directRef, {
+              'isScanned': true,
+              'status': 'checked_in',
+              'scannedAt': FieldValue.serverTimestamp(),
+              'qrToken': null,
+            });
+            return pName;
+          });
+
+          if (txPassengerName != null) {
+            debugPrint('consumeTicket: Strateji 1 BAŞARILI ✓ passenger=$txPassengerName');
+            return QrConsumeResult(
+              success: true,
+              code: 'ok',
+              message: 'QR doğrulandı.',
+              passengerName: txPassengerName,
+            );
+          }
+
+          // Transaction false döndü ama hata yok — bilet geçersiz
+          return const QrConsumeResult(
+            success: false,
+            code: 'invalid_or_used',
+            message: 'QR geçersiz, farklı tura ait veya daha önce kullanılmış.',
+          );
+        } on FirebaseException catch (e) {
+          if (e.code == 'permission-denied') {
+            debugPrint('consumeTicket: Strateji 1 permission-denied, fallback deneniyor...');
+            // İzin hatası — Strateji 2'ye düş
+          } else {
+            rethrow;
+          }
+        }
+      }
+
+      // ── STRATEJİ 2: qrToken alanı ile sorgu ──
+      debugPrint('consumeTicket: Strateji 2 — qrToken alanı ile koleksiyon sorgusu');
       QuerySnapshot<Map<String, dynamic>> query = await _firestore
           .collection('tickets')
           .where('qrToken', isEqualTo: normalizedToken)
@@ -435,30 +532,20 @@ class FirebaseService {
         ref = query.docs.first.reference;
       }
 
+      // Eşleşme yoksa ham token ile dene
       if (ref == null) {
         query = await _firestore
             .collection('tickets')
             .where('qrToken', isEqualTo: qrToken.trim())
             .limit(1)
             .get();
-
         if (query.docs.isNotEmpty) {
           ref = query.docs.first.reference;
         }
       }
 
       if (ref == null) {
-        if (payloadTicketId.isNotEmpty) {
-          final fallbackRef = _firestore.collection('tickets').doc(payloadTicketId);
-          final doc = await fallbackRef.get();
-          if (doc.exists) {
-            ref = fallbackRef;
-          }
-        }
-      }
-
-      if (ref == null) {
-        debugPrint('consumeTicketByQrToken: Token bulunamadı');
+        debugPrint('consumeTicket: Token bulunamadı (tüm stratejiler denendi)');
         return const QrConsumeResult(
           success: false,
           code: 'token_not_found',
@@ -467,33 +554,23 @@ class FirebaseService {
       }
 
       final ticketRef = ref;
-
-      final txSuccess = await _firestore.runTransaction((tx) async {
+      final txPassengerName2 = await _firestore.runTransaction<String?>((tx) async {
         final snapshot = await tx.get(ticketRef);
-        if (!snapshot.exists) return false;
+        if (!snapshot.exists) return null;
 
         final data = snapshot.data() as Map<String, dynamic>;
         final alreadyScanned = data['isScanned'] == true;
         final status = data['status']?.toString().toLowerCase() ?? '';
         final tourId = data['tourId']?.toString() ?? '';
-        final tokenInDb = data['qrToken']?.toString() ?? '';
-        final normalizedInDb = _normalizeQrToken(tokenInDb);
+        final pName = data['passengerName']?.toString() ?? '';
 
         if (tourId.trim() != expectedTourId.trim()) {
-          debugPrint(
-            'consumeTicketByQrToken: Tur eşleşmedi. ticketTourId=$tourId expectedTourId=$expectedTourId',
-          );
-          return false;
-        }
-        if (normalizedInDb != normalizedToken) {
-          debugPrint('consumeTicketByQrToken: DB token uyuşmadı');
-          return false;
+          debugPrint('consumeTicket: Tur eşleşmedi (sorgu yolu). ticketTourId=$tourId');
+          return null;
         }
         if (alreadyScanned || status == 'cancelled' || status == 'completed') {
-          debugPrint(
-            'consumeTicketByQrToken: Bilet artık geçersiz. alreadyScanned=$alreadyScanned status=$status',
-          );
-          return false;
+          debugPrint('consumeTicket: Bilet artık geçersiz (sorgu yolu).');
+          return null;
         }
 
         tx.update(ticketRef, {
@@ -502,12 +579,17 @@ class FirebaseService {
           'scannedAt': FieldValue.serverTimestamp(),
           'qrToken': null,
         });
-
-        return true;
+        return pName;
       });
 
-      if (txSuccess) {
-        return const QrConsumeResult(success: true, code: 'ok', message: 'QR doğrulandı.');
+      if (txPassengerName2 != null) {
+        debugPrint('consumeTicket: Strateji 2 BAŞARILI ✓ passenger=$txPassengerName2');
+        return QrConsumeResult(
+          success: true,
+          code: 'ok',
+          message: 'QR doğrulandı.',
+          passengerName: txPassengerName2,
+        );
       }
 
       return const QrConsumeResult(
@@ -517,10 +599,10 @@ class FirebaseService {
       );
     } on FirebaseException catch (e) {
       if (e.code == 'permission-denied') {
-        debugPrint('consumeTicketByQrToken: permission-denied, no-read fallback deneniyor');
+        debugPrint('consumeTicket: permission-denied, blind update fallback deneniyor');
         return _consumeTicketByPayloadNoRead(
           ticketId: payloadTicketId,
-          payloadTourId: payloadTourId,
+          payloadTourId: '',
           expectedTourId: expectedTourId,
         );
       }

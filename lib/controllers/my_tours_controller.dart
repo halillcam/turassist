@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -10,9 +12,11 @@ import '../services/firebase_service.dart';
 /// Turlarım ekranı controller'ı.
 ///
 /// Kullanıcının biletlerini, aktif tur durumunu ve
-/// tur programını yönetir.
+/// tur programını yönetir. Firestore real-time listener
+/// sayesinde rehber QR okuttuğunda ekran otomatik güncellenir.
 class MyToursController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
+  StreamSubscription<List<TicketModel>>? _ticketSubscription;
 
   // ─── Durum ───
   final RxBool isLoading = true.obs;
@@ -32,9 +36,84 @@ class MyToursController extends GetxController {
   void onInit() {
     super.onInit();
     loadData();
+    _startTicketListener();
+
+    // Yedek mekanizma: tickets listesi her değiştiğinde checked_in değerlendir.
+    // Stream listener async gecikmelerinden bağımsız çalışır.
+    ever(tickets, (_) => _evaluateCheckedInState());
   }
 
-  /// Kullanıcının biletlerini ve ilgili tur verilerini yükler.
+  @override
+  void onClose() {
+    _ticketSubscription?.cancel();
+    super.onClose();
+  }
+
+  /// Bilet listesinden checked_in durumunu değerlendirir.
+  /// Stream listener veya `ever()` watcher tarafından tetiklenir.
+  void _evaluateCheckedInState() {
+    final checkedIn = tickets.where((t) => t.status == 'checked_in' || t.isScanned).toList();
+
+    if (checkedIn.isNotEmpty) {
+      final incoming = checkedIn.first;
+      final current = checkedInTicket.value;
+      if (current == null ||
+          current.id != incoming.id ||
+          current.isScanned != incoming.isScanned ||
+          current.status != incoming.status) {
+        debugPrint(
+          'EVALUATE: checked_in bilet tespit → ${incoming.id} '
+          '(isScanned=${incoming.isScanned}, status=${incoming.status})',
+        );
+        checkedInTicket.value = incoming;
+        // Tur detaylarını arka planda yükle (UI zaten spinner gösterir)
+        _loadActiveTourDetail(incoming.tourId);
+      }
+    } else if (checkedInTicket.value != null) {
+      debugPrint('EVALUATE: checked_in bilet yok → listeye dön');
+      checkedInTicket.value = null;
+      activeTour.value = null;
+      programDays.clear();
+    }
+  }
+
+  /// Firestore real-time listener: bilet durumu değiştiğinde (örn. rehber
+  /// QR okuttuğunda `isScanned` → true) ekranı otomatik günceller.
+  void _startTicketListener() {
+    _ticketSubscription?.cancel();
+    _ticketSubscription = _firebaseService.getUserTicketsStream().listen(
+      (updatedTickets) async {
+        debugPrint('TICKET_STREAM: ${updatedTickets.length} bilet güncellendi');
+
+        // Biletleri hemen güncelle → ever(tickets, ...) otomatik tetiklenir
+        // ve checked_in durumu HEMEN değerlendirilir (await beklemeden).
+        tickets.assignAll(updatedTickets);
+
+        // Tur bilgilerini arka planda cache'le
+        for (final ticket in updatedTickets) {
+          if (!ticketTours.containsKey(ticket.tourId)) {
+            final tour = await _firebaseService.getTourById(ticket.tourId);
+            if (tour != null) {
+              ticketTours[ticket.tourId] = tour;
+            }
+          }
+        }
+
+        // Stream ilk veriyi getirdiğinde loading'i kapat
+        if (isLoading.value) {
+          isLoading.value = false;
+        }
+      },
+      onError: (e) {
+        debugPrint('TICKET_STREAM: HATA → $e');
+        if (isLoading.value) {
+          isLoading.value = false;
+        }
+      },
+    );
+  }
+
+  /// Kullanıcının biletlerini ve ilgili tur verilerini yükler (ilk yükleme).
   Future<void> loadData() async {
     try {
       isLoading.value = true;
@@ -44,9 +123,6 @@ class MyToursController extends GetxController {
 
       final userTickets = await _firebaseService.getUserTickets();
       debugPrint('LOAD_DATA: ${userTickets.length} bilet bulundu');
-      for (final t in userTickets) {
-        debugPrint('  BILET: id=${t.id}, tourId=${t.tourId}, status=${t.status}');
-      }
       tickets.assignAll(userTickets);
 
       // checked_in veya isScanned olan bilet varsa aktif tur olarak yükle
@@ -63,8 +139,6 @@ class MyToursController extends GetxController {
           if (tour != null) {
             ticketTours[ticket.tourId] = tour;
             debugPrint('LOAD_DATA: Tur cache\'lendi → ${tour.title}');
-          } else {
-            debugPrint('LOAD_DATA: Tur bulunamadı → ${ticket.tourId}');
           }
         }
       }
