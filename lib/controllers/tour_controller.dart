@@ -50,25 +50,53 @@ class TourController extends GetxController {
     }
   }
 
-  // Turları region'a göre grupla (sıralı)
+  /// seriesId'ye göre grupla; her seri için ilk turu "display" olarak kullan.
+  /// UI'da tek kart göstermek için.
+  List<TourModel> get displayTours {
+    final bySeries = <String, List<TourModel>>{};
+    for (final tour in tours) {
+      final key = tour.seriesId ?? tour.id;
+      bySeries.putIfAbsent(key, () => []).add(tour);
+    }
+    return bySeries.values.map((list) {
+      list.sort((a, b) {
+        final ad = a.departureDate;
+        final bd = b.departureDate;
+        if (ad == null && bd == null) return 0;
+        if (ad == null) return 1;
+        if (bd == null) return -1;
+        return ad.compareTo(bd);
+      });
+      return list.first;
+    }).toList();
+  }
+
+  /// Verilen display tour'a ait serideki tüm turları döner.
+  List<TourModel> getToursInSeries(TourModel displayTour) {
+    if (displayTour.seriesId == null) return [displayTour];
+    return tours.where((t) => t.seriesId == displayTour.seriesId).toList()
+      ..sort((a, b) {
+        final ad = a.departureDate;
+        final bd = b.departureDate;
+        if (ad == null && bd == null) return 0;
+        if (ad == null) return 1;
+        if (bd == null) return -1;
+        return ad.compareTo(bd);
+      });
+  }
+
+  // Turları region'a göre grupla (sıralı) - displayTours kullanır
   Map<String, List<TourModel>> get toursByRegion {
     final grouped = <String, List<TourModel>>{};
-    for (var tour in tours) {
+    for (var tour in displayTours) {
       final region = tour.region.isEmpty ? 'Diğer' : tour.region;
-      if (!grouped.containsKey(region)) {
-        grouped[region] = [];
-      }
+      if (!grouped.containsKey(region)) grouped[region] = [];
       grouped[region]!.add(tour);
     }
-
-    // regionOrder sırasına göre sırala
     final sorted = <String, List<TourModel>>{};
     for (var region in regionOrder) {
-      if (grouped.containsKey(region)) {
-        sorted[region] = grouped.remove(region)!;
-      }
+      if (grouped.containsKey(region)) sorted[region] = grouped.remove(region)!;
     }
-    // Sırada olmayanları sona ekle
     sorted.addAll(grouped);
     return sorted;
   }

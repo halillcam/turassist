@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import '../../config/colors.dart';
 import '../../models/tour_model.dart';
 import '../../services/test_tour_service.dart';
@@ -35,6 +36,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
   // Departure
   final _departureTimeController = TextEditingController();
   final Set<int> _selectedDepartureDays = {};
+  final List<DateTime> _selectedDates = [];
 
   // State
   bool _isLoading = false;
@@ -66,6 +68,35 @@ class _TestTourScreenState extends State<TestTourScreen> {
     'Günü Birlik',
     'Yurtdışı',
   ];
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: DateTime(now.year + 2),
+    );
+
+    if (date == null) return;
+
+    // Aynı günü tekrar ekleme
+    if (_selectedDates.any((d) => _isSameDay(d, date))) return;
+
+    setState(() {
+      _selectedDates.add(DateTime(date.year, date.month, date.day));
+    });
+  }
+
+  void _removeSelectedDate(DateTime date) {
+    setState(() {
+      _selectedDates.removeWhere((d) => _isSameDay(d, date));
+    });
+  }
 
   @override
   void dispose() {
@@ -161,8 +192,25 @@ class _TestTourScreenState extends State<TestTourScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final tour = TourModel(
-        id: '', // Firestore otomatik oluşturacak
+      final programData = _buildProgramData();
+
+      // Önümüzdeki 1 ay için tarih listesi: haftalık günler VEYA özel tarihler
+      List<DateTime> datesToCreate = [];
+      if (_selectedDates.isNotEmpty) {
+        datesToCreate = _selectedDates.map((d) => DateTime(d.year, d.month, d.day)).toList();
+        datesToCreate.sort((a, b) => a.compareTo(b));
+      } else if (_selectedDepartureDays.isNotEmpty) {
+        final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+        for (var i = 0; i < 31; i++) {
+          final d = today.add(Duration(days: i));
+          if (_selectedDepartureDays.contains(d.weekday)) {
+            datesToCreate.add(DateTime(d.year, d.month, d.day));
+          }
+        }
+      }
+
+      final baseTour = TourModel(
+        id: '',
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         price: double.tryParse(_priceController.text) ?? 0,
@@ -184,23 +232,40 @@ class _TestTourScreenState extends State<TestTourScreen> {
         createdAt: DateTime.now(),
         isDeleted: false,
         extraDetail: '',
-        departureDays: _selectedDepartureDays.toList()..sort(),
+        departureDays: [],
         departureTime: _departureTimeController.text.trim(),
       );
 
-      final docId = await _service.addTour(tour);
-      _addLog('Tur eklendi: "${tour.title}" (ID: $docId)');
-
-      // Tur programını ekle
-      final programData = _buildProgramData();
-      if (programData.isNotEmpty) {
-        await _service.addTourProgram(docId, programData);
-        _addLog('Program eklendi: ${programData.length} gün (Tur: $docId)');
+      if (datesToCreate.isEmpty) {
+        Get.snackbar(
+          'Uyarı',
+          'En az bir çıkış günü (Pzt, Sal...) veya özel tarih seçmelisin.',
+          backgroundColor: AppColors.warning.withValues(alpha: 0.9),
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+          margin: const EdgeInsets.all(12),
+        );
+        setState(() => _isLoading = false);
+        return;
       }
 
+      final seriesId = 'series_${DateTime.now().microsecondsSinceEpoch}';
+      final results = await _service.addToursForDates(baseTour, datesToCreate, seriesId: seriesId);
+
+      int successCount = 0;
+      for (final result in results) {
+        if (result.success && result.docId != null) {
+          successCount++;
+          if (programData.isNotEmpty) {
+            await _service.addTourProgram(result.docId!, programData);
+          }
+        }
+      }
+
+      _addLog('$successCount tur eklendi (seri: $seriesId)');
       Get.snackbar(
         'Başarılı',
-        'Tur başarıyla eklendi!',
+        '$successCount tarih için tur oluşturuldu. UI\'da tek kart görünecek.',
         backgroundColor: AppColors.success.withValues(alpha: 0.9),
         colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
@@ -578,6 +643,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
     _programDays.clear();
     _departureTimeController.clear();
     _selectedDepartureDays.clear();
+    _selectedDates.clear();
     setState(() => _selectedRegion = 'Marmara');
   }
 
@@ -723,6 +789,8 @@ class _TestTourScreenState extends State<TestTourScreen> {
                         _buildSectionTitle('Çıkış Takvimi'),
                         const SizedBox(height: 8),
                         _buildDepartureDaysSelector(),
+                        const SizedBox(height: 12),
+                        _buildSelectedDatesSection(),
                         const SizedBox(height: 12),
                         _buildTextField(
                           controller: _departureTimeController,
@@ -1134,10 +1202,101 @@ class _TestTourScreenState extends State<TestTourScreen> {
             const Padding(
               padding: EdgeInsets.only(top: 8),
               child: Text(
-                'Boş bırakılırsa takvim ayarlanmamış olur',
+                'Seçilen günler turun çıkış tarihleri olur. Satın alırken bu tarihlerden seçilir.',
                 style: TextStyle(color: AppColors.slate500, fontSize: 11),
               ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Yaklaşan ${_selectedDepartureDays.length} gün için tarih seçenekleri gösterilecek.',
+                style: const TextStyle(color: AppColors.primary, fontSize: 11),
+              ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedDatesSection() {
+    final dateFormat = DateFormat('dd.MM.yyyy');
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.slate800,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.slate700),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.event, color: AppColors.slate500, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Özel Tekil Tarihler',
+                style: TextStyle(color: AppColors.slate400, fontSize: 14),
+              ),
+              const Spacer(),
+              if (_selectedDates.isNotEmpty)
+                GestureDetector(
+                  onTap: () => setState(_selectedDates.clear),
+                  child: const Text(
+                    'Temizle',
+                    style: TextStyle(color: AppColors.error, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_selectedDates.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedDates.map((date) {
+                final label = dateFormat.format(date);
+                return Chip(
+                  backgroundColor: AppColors.slate900,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: AppColors.primary.withOpacity(0.6)),
+                  ),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => _removeSelectedDate(date),
+                        child: const Icon(Icons.close, size: 14, color: AppColors.slate400),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            )
+          else
+            const Text(
+              '"Tarih Ekle" ile özel çıkış tarihleri ekleyebilirsin. Satın alırken listeden seçilir.',
+              style: TextStyle(color: AppColors.slate500, fontSize: 11),
+            ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _pickDate,
+            icon: const Icon(Icons.add, color: AppColors.primary, size: 18),
+            label: const Text(
+              'Tarih Ekle',
+              style: TextStyle(color: AppColors.primary, fontSize: 13),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppColors.primary.withOpacity(0.4)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            ),
+          ),
         ],
       ),
     );

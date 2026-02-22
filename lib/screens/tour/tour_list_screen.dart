@@ -67,17 +67,11 @@ class _TourListScreenState extends State<TourListScreen> {
     final grouped = <String, List<TourModel>>{};
     for (var tour in tours) {
       final region = tour.region.isEmpty ? 'Diğer' : tour.region;
-      if (!grouped.containsKey(region)) {
-        grouped[region] = [];
-      }
-      grouped[region]!.add(tour);
+      grouped.putIfAbsent(region, () => []).add(tour);
     }
-    // Sabit sıralama
     final sorted = <String, List<TourModel>>{};
     for (var region in TourController.regionOrder) {
-      if (grouped.containsKey(region)) {
-        sorted[region] = grouped.remove(region)!;
-      }
+      if (grouped.containsKey(region)) sorted[region] = grouped.remove(region)!;
     }
     sorted.addAll(grouped);
     return sorted;
@@ -135,7 +129,7 @@ class _TourListScreenState extends State<TourListScreen> {
                         ),
 
                         // Boş sonuç
-                        if (_filterTours(_tourController.tours).isEmpty)
+                        if (_filterTours(_tourController.displayTours).isEmpty)
                           SliverFillRemaining(
                             child: Center(
                               child: Column(
@@ -156,7 +150,7 @@ class _TourListScreenState extends State<TourListScreen> {
                           SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (BuildContext context, int index) {
-                                final filteredTours = _filterTours(_tourController.tours);
+                                final filteredTours = _filterTours(_tourController.displayTours);
                                 final groupedTours = _groupToursByRegion(filteredTours);
                                 final regions = groupedTours.keys.toList();
 
@@ -171,7 +165,7 @@ class _TourListScreenState extends State<TourListScreen> {
                               },
                               childCount: _tourController.tours.isEmpty
                                   ? 0
-                                  : _groupToursByRegion(_filterTours(_tourController.tours)).length,
+                                  : _groupToursByRegion(_filterTours(_tourController.displayTours)).length,
                             ),
                           ),
                       ],
@@ -355,7 +349,8 @@ class _TourListScreenState extends State<TourListScreen> {
                 child: TourCard(
                   tour: tours[index],
                   onTap: () {
-                    Get.toNamed('/tour-detail', arguments: tours[index]);
+                    final series = _tourController.getToursInSeries(tours[index]);
+                    Get.toNamed('/tour-detail', arguments: series);
                   },
                 ),
               );

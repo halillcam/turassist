@@ -57,6 +57,16 @@ class TourModel {
   /// Çıkış saati, örn: "09:00".
   final String departureTime;
 
+  /// Tekil tur tarihi (opsiyonel, eski tek tarih alanı)
+  final DateTime? departureDate;
+
+  /// Özel çıkış tarihleri listesi. Bu tarihler turun altında slot olarak kullanılır.
+  final List<DateTime>? departureDates;
+
+  /// Aynı turun farklı tarihlere ait instance'larını gruplamak için.
+  /// Aynı seriesId'ye sahip turlar UI'da tek kart olarak gösterilir.
+  final String? seriesId;
+
   TourModel({
     required this.id,
     required this.title,
@@ -75,6 +85,9 @@ class TourModel {
     required this.isDeleted,
     this.departureDays = const [],
     this.departureTime = '',
+    this.departureDate,
+    this.departureDates,
+    this.seriesId,
   });
 
   factory TourModel.fromFirestore(DocumentSnapshot doc) {
@@ -98,6 +111,15 @@ class TourModel {
       departureDays:
           (data['departureDays'] as List<dynamic>?)?.map((e) => (e as num).toInt()).toList() ?? [],
       departureTime: data['departureTime'] ?? '',
+      departureDate: (data['departureDate'] as Timestamp?)?.toDate(),
+      departureDates: () {
+        final raw = data['departureDates'];
+        if (raw == null) return null;
+        final list = raw as List<dynamic>?;
+        if (list == null || list.isEmpty) return null;
+        return list.map((e) => e is Timestamp ? e.toDate() : null).whereType<DateTime>().toList();
+      }(),
+      seriesId: data['seriesId']?.toString(),
     );
   }
 
@@ -119,28 +141,47 @@ class TourModel {
       'isDeleted': isDeleted,
       'departureDays': departureDays,
       'departureTime': departureTime,
+      'departureDate': departureDate != null ? Timestamp.fromDate(departureDate!) : null,
+      'departureDates':
+          departureDates?.map((d) => Timestamp.fromDate(d)).toList(),
+      'seriesId': seriesId,
     };
   }
 
   /// Yakın [count] çıkış tarihini hesaplar.
-  /// [departureDays] boşsa boş liste döner.
+  /// departureDays (haftalık) + departureDates (özel tarihler) birleştirilir.
   List<DateTime> getUpcomingDepartures({int count = 8}) {
-    if (departureDays.isEmpty) return [];
-
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final seen = <String>{};
     final result = <DateTime>[];
-    var cursor = today;
 
-    // En fazla 60 gün ileri bak, istenen sayıya ulaşınca dur
-    for (var i = 0; i < 60 && result.length < count; i++) {
-      final d = cursor.add(Duration(days: i));
-      // DateTime.weekday: 1=Monday … 7=Sunday
-      if (departureDays.contains(d.weekday)) {
-        result.add(d);
+    void addIfUnique(DateTime d) {
+      if (d.isBefore(today)) return;
+      final key = '${d.year}-${d.month}-${d.day}';
+      if (seen.contains(key)) return;
+      seen.add(key);
+      result.add(DateTime(d.year, d.month, d.day));
+    }
+
+    // 1. Özel tarihler (departureDates)
+    for (final d in departureDates ?? []) {
+      if (result.length >= count) break;
+      addIfUnique(d);
+    }
+
+    // 2. Haftalık günlerden türetilen tarihler (departureDays)
+    if (departureDays.isNotEmpty) {
+      for (var i = 0; i < 60 && result.length < count; i++) {
+        final d = today.add(Duration(days: i));
+        if (departureDays.contains(d.weekday)) {
+          addIfUnique(d);
+        }
       }
     }
-    return result;
+
+    result.sort((a, b) => a.compareTo(b));
+    return result.take(count).toList();
   }
 
   /// Bugün çıkış günü mü?

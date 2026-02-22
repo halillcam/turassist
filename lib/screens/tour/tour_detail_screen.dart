@@ -12,9 +12,12 @@ import '../../models/tour_program_model.dart';
 import '../../services/firebase_service.dart';
 
 class TourDetailScreen extends StatefulWidget {
-  final TourModel tour;
+  /// Serideki tüm turlar (aynı turun farklı tarihleri). İlk eleman display için kullanılır.
+  final List<TourModel> toursInSeries;
 
-  const TourDetailScreen({super.key, required this.tour});
+  const TourDetailScreen({super.key, required this.toursInSeries});
+
+  TourModel get _displayTour => toursInSeries.first;
 
   @override
   State<TourDetailScreen> createState() => _TourDetailScreenState();
@@ -32,7 +35,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   Future<void> _loadTourProgram() async {
-    final days = await FirebaseService().getTourProgram(widget.tour.id);
+    final days = await FirebaseService().getTourProgram(widget._displayTour.id);
     if (mounted) {
       setState(() {
         _programDays = days;
@@ -43,7 +46,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tour = widget.tour;
+    final tour = widget._displayTour;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -84,7 +87,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   /// Test amaçlı hızlı rezervasyon: ödeme atlayarak bilet oluşturur.
-  Future<void> _handleReservation(TourModel tour) async {
+  Future<void> _handleReservation() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       Get.snackbar(
@@ -97,12 +100,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       return;
     }
 
-    // ── Çıkış günü seçimi ──
-    DateTime? selectedDate;
-    if (tour.departureDays.isNotEmpty) {
-      selectedDate = await _showDepartureDatePicker(tour);
-      if (selectedDate == null) return; // İptal edildi
-    }
+    // Serideki turların departureDate'lerinden tarih seçtir (her tarih = ayrı tur doc)
+    if (widget.toursInSeries.isEmpty) return;
+    final selected = await _showDepartureDatePicker(widget.toursInSeries);
+    if (selected == null) return;
 
     final profile = await FirebaseService().getUserProfile();
     final profileName = profile?.fullName.trim() ?? '';
@@ -114,20 +115,17 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               ? displayName
               : (emailFallback.isNotEmpty ? emailFallback : 'Yolcu'));
 
-    final slotId = selectedDate != null
-        ? DateFormat('yyyy-MM-dd').format(selectedDate)
-        : 'no_schedule';
-
+    final slotId = DateFormat('yyyy-MM-dd').format(selected.date);
     final bookingController = Get.put(BookingController());
     await bookingController.purchaseTicket(
-      tourId: tour.id,
+      tourId: selected.tour.id,
       slotId: slotId,
-      companyId: tour.companyId,
+      companyId: selected.tour.companyId,
       passengerName: passengerName,
       tcNo: '00000000000',
-      price: tour.price,
+      price: selected.tour.price,
       subMerchantKey: '',
-      departureDate: selectedDate,
+      departureDate: selected.date,
     );
 
     // MyToursController'u sil ki yeniden oluşturulup loadData çağrılsın
@@ -139,18 +137,40 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     Get.offNamed(AppRoutes.myTours);
   }
 
-  /// Yakın çıkış tarihlerini gösteren bottom sheet. Kalan kapasite bilgisiyle.
-  Future<DateTime?> _showDepartureDatePicker(TourModel tour) async {
-    final upcoming = tour.getUpcomingDepartures(count: 8);
-    if (upcoming.isEmpty) return null;
+  /// Serideki turların tarihlerini gösterir. Her tarih = ayrı tur doc ise o doc'un ID'si ile bilet oluşur.
+  /// Legacy tek tur (departureDays/departureDates) ise aynı tour.id, slotId ile ayrışır.
+  Future<({TourModel tour, DateTime date})?> _showDepartureDatePicker(List<TourModel> toursInSeries) async {
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    var options = <({TourModel tour, DateTime date})>[];
 
-    // Slot doluluk bilgilerini çek
-    final slotIds = upcoming.map((d) => DateFormat('yyyy-MM-dd').format(d)).toList();
-    final counts = await FirebaseService().getSlotTicketCounts(tour.id, slotIds);
+    final withDate = toursInSeries.where((t) => t.departureDate != null).toList();
+    if (withDate.isNotEmpty) {
+      for (final t in withDate) {
+        final d = t.departureDate!;
+        final date = DateTime(d.year, d.month, d.day);
+        if (!date.isBefore(today)) options.add((tour: t, date: date));
+    final tourIds = options.map((o) => o.tour.id).toSet().toList();
+      }
+    } else {
+      final first = toursInSeries.first;
+      final upcoming = first.getUpcomingDepartures(count: 12);
+      for (final date in upcoming) {
+        options.add((tour: first, date: date));
+      }
+    }
+    options.sort((a, b) => a.date.compareTo(b.date));
+    if (options.isEmpty) return null;
+
+    final slotIds = options.map((o) => DateFormat('yyyy-MM-dd').format(o.date)).toList();
+    final counts = <String, int>{};
+    for (var i = 0; i < options.length; i++) {
+      final c = await FirebaseService().getSlotTicketCounts(options[i].tour.id, [slotIds[i]]);
+      counts[slotIds[i]] = c[slotIds[i]] ?? 0;
+    }
 
     if (!mounted) return null;
 
-    return showModalBottomSheet<DateTime>(
+    return showModalBottomSheet<({TourModel tour, DateTime date})>(
       context: context,
       backgroundColor: AppColors.cardDark,
       shape: const RoundedRectangleBorder(
@@ -182,18 +202,18 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  if (tour.departureTime.isNotEmpty) ...[
+                  if (options.isNotEmpty && options.first.tour.departureTime.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Kalkış saati: ${tour.departureTime}',
+                      'Kalkış saati: ${options.first.tour.departureTime}',
                       style: const TextStyle(color: AppColors.slate400, fontSize: 13),
                     ),
                   ],
                   const SizedBox(height: 16),
-                  ...upcoming.map((date) {
-                    final sid = DateFormat('yyyy-MM-dd').format(date);
+                  ...options.map((opt) {
+                    final sid = DateFormat('yyyy-MM-dd').format(opt.date);
                     final sold = counts[sid] ?? 0;
-                    final remaining = tour.capacity - sold;
+                    final remaining = opt.tour.capacity - sold;
                     final isFull = remaining <= 0;
 
                     return Padding(
@@ -202,7 +222,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                         color: Colors.transparent,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          onTap: isFull ? null : () => Navigator.of(ctx).pop(date),
+                          onTap: isFull ? null : () => Navigator.of(ctx).pop(opt),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
@@ -229,7 +249,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        _formatDateTurkish(date),
+                                        _formatDateTurkish(opt.date),
                                         style: TextStyle(
                                           color: isFull ? AppColors.slate500 : AppColors.white,
                                           fontSize: 15,
@@ -444,8 +464,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                 ],
               ),
 
-              // Çıkış günleri bilgisi
-              if (tour.departureDays.isNotEmpty) ...[
+              // Çıkış günleri / tarihler bilgisi
+              if (tour.departureDays.isNotEmpty ||
+                  (tour.departureDates != null && tour.departureDates!.isNotEmpty) ||
+                  widget.toursInSeries.any((t) => t.departureDate != null)) ...[
                 const SizedBox(height: 20),
                 Container(height: 1, color: AppColors.slate800),
                 const SizedBox(height: 16),
@@ -453,16 +475,21 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   children: [
                     const Icon(Icons.calendar_month, color: AppColors.primary, size: 20),
                     const SizedBox(width: 8),
-                    Text(
-                      'Çıkış günleri: ${tour.departureDaysText}',
-                      style: const TextStyle(
-                        color: AppColors.slate300,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Text(
+                        tour.departureDays.isNotEmpty
+                            ? 'Çıkış günleri: ${tour.departureDaysText}'
+                            : tour.departureDates != null && tour.departureDates!.isNotEmpty
+                                ? 'Özel tarihler: ${tour.departureDates!.length} tarih'
+                                : '${widget.toursInSeries.where((t) => t.departureDate != null).length} farklı tarihte çıkış',
+                        style: const TextStyle(
+                          color: AppColors.slate300,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     if (tour.departureTime.isNotEmpty) ...[
-                      const Spacer(),
                       Icon(Icons.access_time, color: AppColors.primary, size: 18),
                       const SizedBox(width: 4),
                       Text(
@@ -825,7 +852,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
             // Reservation button
             GestureDetector(
-              onTap: () => _handleReservation(tour),
+              onTap: _handleReservation,
               child: Container(
                 height: 48,
                 padding: const EdgeInsets.symmetric(horizontal: 24),

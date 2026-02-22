@@ -111,6 +111,8 @@ class GoogleAuthService {
   /// Google hesabından çıkış yap (Firebase + Google oturumlarını kapatır).
   Future<void> signOut() async {
     try {
+      // Web'de (Chrome) google_sign_in v7 için önce initialize zorunlu.
+      await _ensureInitialized();
       await _googleSignIn.signOut();
       await _auth.signOut();
     } catch (e) {

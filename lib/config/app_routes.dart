@@ -13,6 +13,7 @@ import '../screens/profile/profile_screen.dart';
 import '../screens/qr/my_qr_screen.dart';
 import '../screens/qr/qr_scanner_screen.dart';
 import '../screens/test/test_tour_screen.dart';
+import '../models/tour_model.dart';
 import '../screens/tour/tour_detail_screen.dart';
 import '../screens/tour/tour_list_screen.dart';
 import '../screens/tour_manager/tour_manager_announcements_screen.dart';
@@ -96,7 +97,11 @@ class AppPages {
     ),
     GetPage(
       name: AppRoutes.tourDetail,
-      page: () => TourDetailScreen(tour: Get.arguments),
+      page: () {
+        final args = Get.arguments;
+        final list = args is List ? List<TourModel>.from(args) : [args as TourModel];
+        return TourDetailScreen(toursInSeries: list);
+      },
       transition: Transition.rightToLeft,
     ),
     GetPage(

@@ -4,6 +4,46 @@ import '../models/tour_model.dart';
 /// Test amaçlı tur verisi ekleme servisi.
 /// Üretim ortamında kullanılmayacak, test sonrası silinecektir.
 class TestTourService {
+  /// Birden fazla tekil tarih için tur ekler. Her tarih için DB'de ayrı doküman oluşur.
+  /// [baseTour] şablon, [dates] her biri için yeni tur, [seriesId] UI'da gruplama için.
+  Future<List<TestTourResult>> addToursForDates(
+    TourModel baseTour,
+    List<DateTime> dates, {
+    required String seriesId,
+  }) async {
+    final results = <TestTourResult>[];
+    for (final date in dates) {
+      final tour = TourModel(
+        id: '',
+        title: baseTour.title,
+        description: baseTour.description,
+        extraDetail: baseTour.extraDetail,
+        price: baseTour.price,
+        imageUrl: baseTour.imageUrl,
+        companyId: baseTour.companyId,
+        guideId: baseTour.guideId,
+        guideName: baseTour.guideName,
+        capacity: baseTour.capacity,
+        city: baseTour.city,
+        region: baseTour.region,
+        busInfo: baseTour.busInfo,
+        createdAt: DateTime.now(),
+        isDeleted: false,
+        departureDays: [],
+        departureTime: baseTour.departureTime,
+        departureDate: date,
+        seriesId: seriesId,
+      );
+      try {
+        final docId = await addTour(tour);
+        results.add(TestTourResult(tourTitle: tour.title, docId: docId, success: true));
+      } catch (e) {
+        results.add(TestTourResult(tourTitle: tour.title, error: e.toString(), success: false));
+      }
+    }
+    return results;
+  }
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// Firestore'a yeni bir tur ekler (POST).
