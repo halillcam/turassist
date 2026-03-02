@@ -483,6 +483,7 @@ class FirebaseService {
   Future<QrConsumeResult> consumeTicketByQrTokenDetailed({
     required String qrToken,
     required String expectedTourId,
+    String? expectedDate,
   }) async {
     final normalizedToken = _normalizeQrToken(qrToken);
     final payloadTicketId = _extractTicketIdFromToken(qrToken);
@@ -547,11 +548,13 @@ class FirebaseService {
               return null;
             }
 
-            // ── Tarih doğrulama: slotId yyyy-MM-dd formatındaysa bugünle karşılaştır ──
-            if (_isDateSlotId(slotId)) {
-              final today = _todaySlotId();
-              if (slotId != today) {
-                debugPrint('consumeTicket: Tarih uyuşmazlığı! slotId=$slotId today=$today');
+            // ── Tarih doğrulama: expectedDate verilmişse slotId ile karşılaştır ──
+            // expectedDate yoksa tarih kontrolü yapılmaz (rehber istediği zaman tarayabilir)
+            if (expectedDate != null && _isDateSlotId(slotId)) {
+              if (slotId != expectedDate) {
+                debugPrint(
+                  'consumeTicket: Tarih uyuşmazlığı! slotId=$slotId expected=$expectedDate',
+                );
                 return '__DATE_MISMATCH__$slotId';
               }
             }
@@ -570,12 +573,12 @@ class FirebaseService {
             if (txPassengerName.startsWith('__DATE_MISMATCH__')) {
               final ticketSlot = txPassengerName.replaceFirst('__DATE_MISMATCH__', '');
               debugPrint(
-                'consumeTicket: Tarih uyuşmazlığı — bilet=$ticketSlot bugün=${_todaySlotId()}',
+                'consumeTicket: Tarih uyuşmazlığı — bilet=$ticketSlot atanmış=$expectedDate',
               );
               return QrConsumeResult(
                 success: false,
                 code: 'date_mismatch',
-                message: 'Bu bilet $ticketSlot tarihli çıkış için geçerli. Bugün okutamazsınız.',
+                message: 'Bu bilet $ticketSlot tarihli. Sizin atanmış tarihiniz $expectedDate.',
               );
             }
             debugPrint('consumeTicket: Strateji 1 BAŞARILI ✓ passenger=$txPassengerName');
@@ -658,12 +661,11 @@ class FirebaseService {
           return null;
         }
 
-        // ── Tarih doğrulama ──
-        if (_isDateSlotId(slotId)) {
-          final today = _todaySlotId();
-          if (slotId != today) {
+        // ── Tarih doğrulama: expectedDate verilmişse slotId ile karşılaştır ──
+        if (expectedDate != null && _isDateSlotId(slotId)) {
+          if (slotId != expectedDate) {
             debugPrint(
-              'consumeTicket: Tarih uyuşmazlığı (sorgu yolu)! slotId=$slotId today=$today',
+              'consumeTicket: Tarih uyuşmazlığı (sorgu yolu)! slotId=$slotId expected=$expectedDate',
             );
             return '__DATE_MISMATCH__$slotId';
           }
@@ -685,7 +687,7 @@ class FirebaseService {
           return QrConsumeResult(
             success: false,
             code: 'date_mismatch',
-            message: 'Bu bilet $ticketSlot tarihli çıkış için geçerli. Bugün okutamazsınız.',
+            message: 'Bu bilet $ticketSlot tarihli. Sizin atanmış tarihiniz $expectedDate.',
           );
         }
         debugPrint('consumeTicket: Strateji 2 BAŞARILI ✓ passenger=$txPassengerName2');

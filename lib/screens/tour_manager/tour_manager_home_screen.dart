@@ -20,6 +20,7 @@ class _GuideDashboardData {
   final String tourTitle;
   final int totalParticipants;
   final int checkedInParticipants;
+  final String? assignedSlotId;
 
   const _GuideDashboardData({
     required this.guideName,
@@ -27,6 +28,7 @@ class _GuideDashboardData {
     this.tourTitle = '',
     this.totalParticipants = 0,
     this.checkedInParticipants = 0,
+    this.assignedSlotId,
   });
 
   int get pendingParticipants {
@@ -94,21 +96,30 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
 
     final participants = await _firebaseService.getTourParticipants(assignedTour.id);
 
-    // Bugünün slot ID'si
-    final now = DateTime.now();
-    final todaySlot =
-        '${now.year.toString().padLeft(4, '0')}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
+    // Atanmış turun slotId'sini bul (departureDate veya departureDates'ten)
+    String? assignedSlotId;
+    if (assignedTour.departureDate != null) {
+      final d = assignedTour.departureDate!;
+      assignedSlotId =
+          '${d.year.toString().padLeft(4, '0')}-'
+          '${d.month.toString().padLeft(2, '0')}-'
+          '${d.day.toString().padLeft(2, '0')}';
+    } else if (assignedTour.departureDates != null && assignedTour.departureDates!.isNotEmpty) {
+      final d = assignedTour.departureDates!.first;
+      assignedSlotId =
+          '${d.year.toString().padLeft(4, '0')}-'
+          '${d.month.toString().padLeft(2, '0')}-'
+          '${d.day.toString().padLeft(2, '0')}';
+    }
 
     final activeParticipants = participants.where((item) {
       final status = item['status']?.toString().toLowerCase() ?? '';
       if (status == 'cancelled') return false;
 
-      // Eğer bilet tarihli slotId'ye sahipse, sadece bugünün yolcularını göster
+      // Eğer bilet tarihli slotId'ye sahipse, sadece atanmış turun tarihindeki yolcuları göster
       final slotId = item['slotId']?.toString() ?? '';
       final isDateSlot = RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(slotId);
-      if (isDateSlot && slotId != todaySlot) return false;
+      if (isDateSlot && assignedSlotId != null && slotId != assignedSlotId) return false;
 
       return true;
     }).toList();
@@ -126,6 +137,7 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
       tourTitle: assignedTour.title,
       totalParticipants: totalCount,
       checkedInParticipants: checkedInCount,
+      assignedSlotId: assignedSlotId,
     );
   }
 
@@ -181,7 +193,10 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const SizedBox(height: 16),
-                          _buildTourTitle(dashboard.tourTitle),
+                          _buildTourTitle(
+                            dashboard.tourTitle,
+                            assignedSlotId: dashboard.assignedSlotId,
+                          ),
                           const SizedBox(height: 16),
                           _buildStatCards(
                             dashboard.totalParticipants,
@@ -190,7 +205,11 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
                           const SizedBox(height: 16),
                           _buildProgressCard(dashboard.pendingParticipants, dashboard.progress),
                           const SizedBox(height: 24),
-                          _buildScanButton(dashboard.tourId, dashboard.tourTitle),
+                          _buildScanButton(
+                            dashboard.tourId,
+                            dashboard.tourTitle,
+                            dashboard.assignedSlotId,
+                          ),
                           const SizedBox(height: 28),
                           _buildManagementTools(
                             tourId: dashboard.tourId,
@@ -293,7 +312,34 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
   }
 
   // ── Tur Başlığı ──
-  Widget _buildTourTitle(String tourTitle) {
+  Widget _buildTourTitle(String tourTitle, {String? assignedSlotId}) {
+    // assignedSlotId'yi güzel formata çevir: "7 Mart 2026"
+    String? formattedDate;
+    if (assignedSlotId != null && assignedSlotId.length == 10) {
+      try {
+        final parts = assignedSlotId.split('-');
+        final year = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final day = int.parse(parts[2]);
+        const months = [
+          '',
+          'Ocak',
+          'Şubat',
+          'Mart',
+          'Nisan',
+          'Mayıs',
+          'Haziran',
+          'Temmuz',
+          'Ağustos',
+          'Eylül',
+          'Ekim',
+          'Kasım',
+          'Aralık',
+        ];
+        formattedDate = '$day ${months[month]} $year';
+      } catch (_) {}
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -306,6 +352,23 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
             letterSpacing: -0.5,
           ),
         ),
+        if (formattedDate != null) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.calendar_today, color: AppColors.primary, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                formattedDate,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 4),
       ],
     );
@@ -452,7 +515,7 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
   }
 
   // ── QR Tara Butonu ──
-  Widget _buildScanButton(String tourId, String tourTitle) {
+  Widget _buildScanButton(String tourId, String tourTitle, String? assignedSlotId) {
     return SizedBox(
       width: double.infinity,
       height: 64,
@@ -462,7 +525,7 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
             : () async {
                 final result = await Get.toNamed(
                   '/qr-scanner',
-                  arguments: {'tourId': tourId, 'tourTitle': tourTitle},
+                  arguments: {'tourId': tourId, 'tourTitle': tourTitle, 'tourDate': assignedSlotId},
                 );
                 // QR başarılıysa dashboard'u yenile
                 if (result == true) {

@@ -139,7 +139,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
   /// Serideki turların tarihlerini gösterir. Her tarih = ayrı tur doc ise o doc'un ID'si ile bilet oluşur.
   /// Legacy tek tur (departureDays/departureDates) ise aynı tour.id, slotId ile ayrışır.
-  Future<({TourModel tour, DateTime date})?> _showDepartureDatePicker(List<TourModel> toursInSeries) async {
+  Future<({TourModel tour, DateTime date})?> _showDepartureDatePicker(
+    List<TourModel> toursInSeries,
+  ) async {
     final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     var options = <({TourModel tour, DateTime date})>[];
 
@@ -149,7 +151,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         final d = t.departureDate!;
         final date = DateTime(d.year, d.month, d.day);
         if (!date.isBefore(today)) options.add((tour: t, date: date));
-    final tourIds = options.map((o) => o.tour.id).toSet().toList();
       }
     } else {
       final first = toursInSeries.first;
@@ -480,8 +481,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                         tour.departureDays.isNotEmpty
                             ? 'Çıkış günleri: ${tour.departureDaysText}'
                             : tour.departureDates != null && tour.departureDates!.isNotEmpty
-                                ? 'Özel tarihler: ${tour.departureDates!.length} tarih'
-                                : '${widget.toursInSeries.where((t) => t.departureDate != null).length} farklı tarihte çıkış',
+                            ? 'Özel tarihler: ${tour.departureDates!.length} tarih'
+                            : '${widget.toursInSeries.where((t) => t.departureDate != null).length} farklı tarihte çıkış',
                         style: const TextStyle(
                           color: AppColors.slate300,
                           fontSize: 13,

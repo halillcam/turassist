@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -74,9 +73,18 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
 
     _isProcessing = true;
 
+    // Atanmış turun tarihini arguments'ten al
+    String? expectedDate;
+    final args = Get.arguments;
+    if (args is Map<String, dynamic>) {
+      expectedDate = args['tourDate']?.toString();
+    }
+    debugPrint('QR_SCANNER: expectedDate → "$expectedDate"');
+
     final result = await _firebaseService.consumeTicketByQrTokenDetailed(
       qrToken: raw,
       expectedTourId: _tourId,
+      expectedDate: expectedDate,
     );
 
     debugPrint(

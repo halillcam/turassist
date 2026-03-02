@@ -90,6 +90,27 @@ class TourModel {
     this.seriesId,
   });
 
+  // ── Türkiye (UTC+3) saat dilimi yardımcıları ──
+  // Türkiye 2016'dan beri kalıcı UTC+3 kullanır (DST yok).
+  // Cihaz saat diliminden bağımsız olarak her zaman doğru tarih verir.
+
+  /// Firestore Timestamp → Türkiye tarihine çevir.
+  static DateTime _tsToTurkeyDate(Timestamp ts) {
+    final utc = DateTime.fromMillisecondsSinceEpoch(ts.millisecondsSinceEpoch, isUtc: true);
+    final turkey = utc.add(const Duration(hours: 3));
+    return DateTime(turkey.year, turkey.month, turkey.day);
+  }
+
+  /// Türkiye tarihini Firestore Timestamp'e çevir (gece yarısı UTC+3).
+  static Timestamp _turkeyDateToTs(DateTime date) {
+    final utcMidnightTurkey = DateTime.utc(
+      date.year,
+      date.month,
+      date.day,
+    ).subtract(const Duration(hours: 3));
+    return Timestamp.fromMillisecondsSinceEpoch(utcMidnightTurkey.millisecondsSinceEpoch);
+  }
+
   factory TourModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return TourModel(
@@ -111,13 +132,15 @@ class TourModel {
       departureDays:
           (data['departureDays'] as List<dynamic>?)?.map((e) => (e as num).toInt()).toList() ?? [],
       departureTime: data['departureTime'] ?? '',
-      departureDate: (data['departureDate'] as Timestamp?)?.toDate(),
+      departureDate: data['departureDate'] is Timestamp
+          ? _tsToTurkeyDate(data['departureDate'] as Timestamp)
+          : null,
       departureDates: () {
         final raw = data['departureDates'];
         if (raw == null) return null;
         final list = raw as List<dynamic>?;
         if (list == null || list.isEmpty) return null;
-        return list.map((e) => e is Timestamp ? e.toDate() : null).whereType<DateTime>().toList();
+        return list.whereType<Timestamp>().map((ts) => _tsToTurkeyDate(ts)).toList();
       }(),
       seriesId: data['seriesId']?.toString(),
     );
@@ -141,9 +164,8 @@ class TourModel {
       'isDeleted': isDeleted,
       'departureDays': departureDays,
       'departureTime': departureTime,
-      'departureDate': departureDate != null ? Timestamp.fromDate(departureDate!) : null,
-      'departureDates':
-          departureDates?.map((d) => Timestamp.fromDate(d)).toList(),
+      'departureDate': departureDate != null ? _turkeyDateToTs(departureDate!) : null,
+      'departureDates': departureDates?.map((d) => _turkeyDateToTs(d)).toList(),
       'seriesId': seriesId,
     };
   }
@@ -164,7 +186,7 @@ class TourModel {
       result.add(DateTime(d.year, d.month, d.day));
     }
 
-    // 1. Özel tarihler (departureDates)
+    // 1. Özel tarihler (departureDates) — zaten Türkiye tarihine çevrilmiş
     for (final d in departureDates ?? []) {
       if (result.length >= count) break;
       addIfUnique(d);
