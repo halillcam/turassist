@@ -8,6 +8,13 @@ import '../config/colors.dart';
 import '../models/announcement_model.dart';
 import '../services/firebase_service.dart';
 
+/// Tura ait duyuruları yöneten controller.
+///
+/// Sorumlulukları:
+/// - Duyuruları Firestore stream ile anlık dinleme
+/// - Müşteri tarafı fallback: izin hatasında `/users/{uid}/notifications`
+///   koleksiyonundan duyuruları dinler
+/// - Duyuru oluşturma (rehber) ve silme (rehber/admin)
 class AnnouncementController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
   var announcements = <AnnouncementModel>[].obs;
@@ -21,7 +28,9 @@ class AnnouncementController extends GetxController {
     super.onClose();
   }
 
-  // Tura ait duyuruları anlık dinle [cite: 25]
+  /// Tura ait duyuruları Firestore stream ile anlık dinlemeye başlar.
+  ///
+  /// Firestore izin hatası alınırsa müşteri bildirimleri fallback'ine geçer.
   void listenAnnouncements(String tourId) {
     _subscription?.cancel();
     isLoading.value = true;
@@ -57,6 +66,8 @@ class AnnouncementController extends GetxController {
         );
   }
 
+  /// Firestore 'announcements' koleksiyonu okuma izni yoksa
+  /// müşterinin kendi bildirim koleksiyonundan fallback olarak dinler.
   void _listenUserNotificationsFallback(String userId, String tourId) {
     _subscription?.cancel();
     _subscription = _firebaseService
@@ -73,7 +84,7 @@ class AnnouncementController extends GetxController {
         );
   }
 
-  // Rehber/Admin duyuru gönderir [cite: 25, 38]
+  /// Rehber / Admin yeni duyuru oluşturur ve katılımcılara bildirim gönderir.
   Future<void> postAnnouncement(String tourId, String msg) async {
     try {
       isLoading.value = true;
@@ -97,7 +108,8 @@ class AnnouncementController extends GetxController {
     }
   }
 
-  // Rehber duyuruyu gönderir ve sadece QR okutan katılımcılara bildirim düşer.
+  /// Duyuru oluşturur; bildirimler sunucu tarafından yalnızca
+  /// QR okutan katılımcılara (`checked_in`) iletilir.
   Future<void> postAnnouncementForCheckedInParticipants(String tourId, String msg) async {
     try {
       isLoading.value = true;
@@ -121,7 +133,7 @@ class AnnouncementController extends GetxController {
     }
   }
 
-  // Tüm duyuruları yükle [cite: 25]
+  /// Tüm geçmiş duyuruları tek seferlik getirir.
   Future<void> fetchAllAnnouncements(String tourId) async {
     try {
       isLoading.value = true;
@@ -134,7 +146,7 @@ class AnnouncementController extends GetxController {
     }
   }
 
-  // Duyuru sil [cite: 25, 38]
+  /// Belirtilen duyuruyu siler ve lokal listeden kaldırır.
   Future<void> deleteAnnouncement(String tourId, String announcementId) async {
     try {
       isLoading.value = true;

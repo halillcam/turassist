@@ -5,6 +5,12 @@ import '../config/colors.dart';
 import '../models/ticket_model.dart';
 import '../services/firebase_service.dart';
 
+/// Bilet satın alma ve iade işlemlerini yöneten controller.
+///
+/// Sorumlulukları:
+/// - Kullanıcının biletlerini uygulama başlatıldığında yükleme
+/// - Tur rezervasyonu oluşturma (bilet + QR token)
+/// - Bilet iptal etme (durum güncellemesi + lokal kaldırma)
 class BookingController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
   var myTickets = <TicketModel>[].obs;
@@ -16,7 +22,7 @@ class BookingController extends GetxController {
     super.onInit();
   }
 
-  // Kullanıcının satın aldığı biletleri yükle [cite: 15]
+  /// Kullanıcının satın aldığı biletleri Firestore'dan getirir.
   Future<void> fetchMyTickets() async {
     try {
       isLoading.value = true;
@@ -29,7 +35,9 @@ class BookingController extends GetxController {
     }
   }
 
-  // Bilet Satın Alma (iyzico entegrasyonu tetikleyici) [cite: 15, 28]
+  /// Tur rezervasyonu oluşturur: bilet ve QR token birlikte kaydedilir.
+  ///
+  /// Başarılı işlem sonrası [myTickets] güncellenir ve başarı mesajı gösterilir.
   Future<void> purchaseTicket({
     required String tourId,
     required String slotId,
@@ -122,7 +130,7 @@ class BookingController extends GetxController {
     }
   }
 
-  // Bilet İptal Etme [cite: 7, 35]
+  /// Bilet iptal eder: Firestore'da durumu 'cancelled' yapıp lokal listeden kaldırır.
   Future<void> cancelTicket(String ticketId) async {
     try {
       isLoading.value = true;

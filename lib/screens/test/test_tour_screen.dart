@@ -35,13 +35,13 @@ class _TestTourScreenState extends State<TestTourScreen> {
 
   // Departure
   final _departureTimeController = TextEditingController();
-  final Set<int> _selectedDepartureDays = {};
-  final List<DateTime> _selectedDates = [];
+  final _selectedDepartureDays = <int>[].obs;
+  final _selectedDates = <DateTime>[].obs;
 
   // State
-  bool _isLoading = false;
-  String _selectedRegion = 'Marmara';
-  final List<String> _logMessages = [];
+  final _isLoading = false.obs;
+  final _selectedRegion = 'Marmara'.obs;
+  final _logMessages = <String>[].obs;
 
   static const _weekDayLabels = {
     1: 'Pzt',
@@ -55,7 +55,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
 
   // Tur Programı - Dinamik günler ve aktiviteler
   // Her eleman: { 'title': TextEditingController, 'activities': [TextEditingController, ...] }
-  final List<Map<String, dynamic>> _programDays = [];
+  final _programDays = <Map<String, dynamic>>[].obs;
 
   final List<String> _regions = [
     'Akdeniz',
@@ -87,15 +87,11 @@ class _TestTourScreenState extends State<TestTourScreen> {
     // Aynı günü tekrar ekleme
     if (_selectedDates.any((d) => _isSameDay(d, date))) return;
 
-    setState(() {
-      _selectedDates.add(DateTime(date.year, date.month, date.day));
-    });
+    _selectedDates.add(DateTime(date.year, date.month, date.day));
   }
 
   void _removeSelectedDate(DateTime date) {
-    setState(() {
-      _selectedDates.removeWhere((d) => _isSameDay(d, date));
-    });
+    _selectedDates.removeWhere((d) => _isSameDay(d, date));
   }
 
   @override
@@ -123,39 +119,33 @@ class _TestTourScreenState extends State<TestTourScreen> {
   }
 
   void _addProgramDay() {
-    setState(() {
-      _programDays.add({
-        'title': TextEditingController(text: '${_programDays.length + 1}. gün'),
-        'activities': <TextEditingController>[TextEditingController()],
-      });
+    _programDays.add({
+      'title': TextEditingController(text: '${_programDays.length + 1}. gün'),
+      'activities': <TextEditingController>[TextEditingController()],
     });
   }
 
   void _removeProgramDay(int index) {
-    setState(() {
-      final day = _programDays.removeAt(index);
-      (day['title'] as TextEditingController).dispose();
-      for (final ctrl in day['activities'] as List<TextEditingController>) {
-        ctrl.dispose();
-      }
-    });
+    final day = _programDays.removeAt(index);
+    (day['title'] as TextEditingController).dispose();
+    for (final ctrl in day['activities'] as List<TextEditingController>) {
+      ctrl.dispose();
+    }
   }
 
   void _addActivity(int dayIndex) {
-    setState(() {
-      (_programDays[dayIndex]['activities'] as List<TextEditingController>).add(
-        TextEditingController(),
-      );
-    });
+    (_programDays[dayIndex]['activities'] as List<TextEditingController>).add(
+      TextEditingController(),
+    );
+    _programDays.refresh();
   }
 
   void _removeActivity(int dayIndex, int activityIndex) {
-    setState(() {
-      final activities = _programDays[dayIndex]['activities'] as List<TextEditingController>;
-      if (activities.length > 1) {
-        activities.removeAt(activityIndex).dispose();
-      }
-    });
+    final activities = _programDays[dayIndex]['activities'] as List<TextEditingController>;
+    if (activities.length > 1) {
+      activities.removeAt(activityIndex).dispose();
+      _programDays.refresh();
+    }
   }
 
   List<Map<String, dynamic>> _buildProgramData() {
@@ -180,16 +170,14 @@ class _TestTourScreenState extends State<TestTourScreen> {
   }
 
   void _addLog(String message, {bool isError = false}) {
-    setState(() {
-      final prefix = isError ? '❌' : '✅';
-      _logMessages.insert(0, '$prefix ${DateTime.now().toString().substring(11, 19)} - $message');
-    });
+    final prefix = isError ? '❌' : '✅';
+    _logMessages.insert(0, '$prefix ${DateTime.now().toString().substring(11, 19)} - $message');
   }
 
   Future<void> _submitTour() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    _isLoading.value = true;
 
     try {
       final programData = _buildProgramData();
@@ -222,7 +210,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
             : _guideNameController.text.trim(),
         capacity: int.tryParse(_capacityController.text) ?? 0,
         city: _cityController.text.trim(),
-        region: _selectedRegion,
+        region: _selectedRegion.value,
         busInfo: BusInfo(
           driverName: _driverNameController.text.trim(),
           phoneNumber: _driverPhoneController.text.trim(),
@@ -245,7 +233,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
           snackPosition: SnackPosition.BOTTOM,
           margin: const EdgeInsets.all(12),
         );
-        setState(() => _isLoading = false);
+        _isLoading.value = false;
         return;
       }
 
@@ -294,12 +282,12 @@ class _TestTourScreenState extends State<TestTourScreen> {
         margin: const EdgeInsets.all(12),
       );
     } finally {
-      setState(() => _isLoading = false);
+      _isLoading.value = false;
     }
   }
 
   Future<void> _addSampleTours() async {
-    setState(() => _isLoading = true);
+    _isLoading.value = true;
 
     final sampleTours = [
       TourModel(
@@ -575,7 +563,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
     } catch (e) {
       _addLog('Toplu ekleme hatası: $e', isError: true);
     } finally {
-      setState(() => _isLoading = false);
+      _isLoading.value = false;
     }
   }
 
@@ -600,7 +588,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
 
     if (confirm != true) return;
 
-    setState(() => _isLoading = true);
+    _isLoading.value = true;
 
     try {
       final deletedCount = await _service.deleteTestTours();
@@ -617,7 +605,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
     } on TestTourException catch (e) {
       _addLog('Silme hatası: ${e.message}', isError: true);
     } finally {
-      setState(() => _isLoading = false);
+      _isLoading.value = false;
     }
   }
 
@@ -644,7 +632,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
     _departureTimeController.clear();
     _selectedDepartureDays.clear();
     _selectedDates.clear();
-    setState(() => _selectedRegion = 'Marmara');
+    _selectedRegion.value = 'Marmara';
   }
 
   @override
@@ -657,264 +645,270 @@ class _TestTourScreenState extends State<TestTourScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           // Toplu örnek tur ekle
-          IconButton(
-            onPressed: _isLoading ? null : _addSampleTours,
-            icon: const Icon(Icons.playlist_add, color: AppColors.success),
-            tooltip: 'Örnek Turları Ekle (10 adet)',
+          Obx(
+            () => IconButton(
+              onPressed: _isLoading.value ? null : _addSampleTours,
+              icon: const Icon(Icons.playlist_add, color: AppColors.success),
+              tooltip: 'Örnek Turları Ekle (10 adet)',
+            ),
           ),
           // Test turlarını sil
-          IconButton(
-            onPressed: _isLoading ? null : _deleteTestTours,
-            icon: const Icon(Icons.delete_sweep, color: AppColors.error),
-            tooltip: 'Test Turlarını Sil',
+          Obx(
+            () => IconButton(
+              onPressed: _isLoading.value ? null : _deleteTestTours,
+              icon: const Icon(Icons.delete_sweep, color: AppColors.error),
+              tooltip: 'Test Turlarını Sil',
+            ),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: AppColors.primary),
-                  SizedBox(height: 16),
-                  Text('İşlem yapılıyor...', style: TextStyle(color: AppColors.slate400)),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Info Banner
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.info.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.info_outline, color: AppColors.info, size: 20),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Bu ekran yalnızca test amaçlıdır. Sağ üstteki butonlarla örnek tur ekleyebilir veya test turlarını toplu silebilirsiniz.',
-                            style: TextStyle(color: AppColors.slate300, fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Manuel Tur Ekleme Formu
-                  _buildSectionTitle('Tur Bilgileri'),
-                  const SizedBox(height: 12),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        _buildTextField(
-                          controller: _titleController,
-                          label: 'Tur Başlığı',
-                          icon: Icons.title,
-                          validator: (v) => v == null || v.isEmpty ? 'Başlık gerekli' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _descriptionController,
-                          label: 'Açıklama',
-                          icon: Icons.description,
-                          maxLines: 3,
-                          validator: (v) => v == null || v.isEmpty ? 'Açıklama gerekli' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _priceController,
-                                label: 'Fiyat (₺)',
-                                icon: Icons.attach_money,
-                                keyboardType: TextInputType.number,
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Fiyat gerekli';
-                                  if (double.tryParse(v) == null) return 'Geçerli sayı girin';
-                                  return null;
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _capacityController,
-                                label: 'Kontenjan',
-                                icon: Icons.people,
-                                keyboardType: TextInputType.number,
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Kontenjan gerekli';
-                                  if (int.tryParse(v) == null) return 'Geçerli sayı girin';
-                                  return null;
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _cityController,
-                          label: 'Şehir',
-                          icon: Icons.location_city,
-                          validator: (v) => v == null || v.isEmpty ? 'Şehir gerekli' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildRegionDropdown(),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _imageUrlController,
-                          label: 'Görsel URL (Opsiyonel)',
-                          icon: Icons.image,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _guideNameController,
-                          label: 'Rehber Adı (Opsiyonel)',
-                          icon: Icons.person,
-                        ),
-
-                        const SizedBox(height: 20),
-                        _buildSectionTitle('Çıkış Takvimi'),
-                        const SizedBox(height: 8),
-                        _buildDepartureDaysSelector(),
-                        const SizedBox(height: 12),
-                        _buildSelectedDatesSection(),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _departureTimeController,
-                          label: 'Çıkış Saati (ör: 09:00)',
-                          icon: Icons.access_time,
-                        ),
-
-                        const SizedBox(height: 20),
-                        _buildSectionTitle('Tur Programı'),
-                        const SizedBox(height: 8),
-                        _buildProgramSection(),
-
-                        const SizedBox(height: 20),
-                        _buildSectionTitle('Araç Bilgileri'),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _driverNameController,
-                          label: 'Şoför Adı',
-                          icon: Icons.drive_eta,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _driverPhoneController,
-                          label: 'Şoför Telefonu',
-                          icon: Icons.phone,
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _plateController,
-                                label: 'Plaka',
-                                icon: Icons.confirmation_number,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _busCapacityController,
-                                label: 'Araç Kapasitesi',
-                                icon: Icons.airline_seat_recline_normal,
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Submit Button
-                  ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _submitTour,
-                    icon: const Icon(Icons.cloud_upload, color: Colors.white),
-                    label: const Text(
-                      'Turu Firestore\'a Ekle',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Log Alanı
-                  if (_logMessages.isNotEmpty) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildSectionTitle('İşlem Logları'),
-                        TextButton(
-                          onPressed: () => setState(_logMessages.clear),
-                          child: const Text(
-                            'Temizle',
-                            style: TextStyle(color: AppColors.slate400, fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
+      body: Obx(
+        () => _isLoading.value
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: AppColors.primary),
+                    SizedBox(height: 16),
+                    Text('İşlem yapılıyor...', style: TextStyle(color: AppColors.slate400)),
+                  ],
+                ),
+              )
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Info Banner
                     Container(
-                      height: 200,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.slate900,
+                        color: AppColors.info.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.slate700),
+                        border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
                       ),
-                      child: ListView.builder(
-                        itemCount: _logMessages.length,
-                        itemBuilder: (context, index) {
-                          final msg = _logMessages[index];
-                          final isError = msg.startsWith('❌');
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                          SizedBox(width: 8),
+                          Expanded(
                             child: Text(
-                              msg,
-                              style: TextStyle(
-                                color: isError ? AppColors.error : AppColors.success,
-                                fontSize: 11,
-                                fontFamily: 'monospace',
-                              ),
+                              'Bu ekran yalnızca test amaçlıdır. Sağ üstteki butonlarla örnek tur ekleyebilir veya test turlarını toplu silebilirsiniz.',
+                              style: TextStyle(color: AppColors.slate300, fontSize: 12),
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
                     ),
-                  ],
 
-                  const SizedBox(height: 40),
-                ],
+                    const SizedBox(height: 20),
+
+                    // Manuel Tur Ekleme Formu
+                    _buildSectionTitle('Tur Bilgileri'),
+                    const SizedBox(height: 12),
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          _buildTextField(
+                            controller: _titleController,
+                            label: 'Tur Başlığı',
+                            icon: Icons.title,
+                            validator: (v) => v == null || v.isEmpty ? 'Başlık gerekli' : null,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _descriptionController,
+                            label: 'Açıklama',
+                            icon: Icons.description,
+                            maxLines: 3,
+                            validator: (v) => v == null || v.isEmpty ? 'Açıklama gerekli' : null,
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _priceController,
+                                  label: 'Fiyat (₺)',
+                                  icon: Icons.attach_money,
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Fiyat gerekli';
+                                    if (double.tryParse(v) == null) return 'Geçerli sayı girin';
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _capacityController,
+                                  label: 'Kontenjan',
+                                  icon: Icons.people,
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Kontenjan gerekli';
+                                    if (int.tryParse(v) == null) return 'Geçerli sayı girin';
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _cityController,
+                            label: 'Şehir',
+                            icon: Icons.location_city,
+                            validator: (v) => v == null || v.isEmpty ? 'Şehir gerekli' : null,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildRegionDropdown(),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _imageUrlController,
+                            label: 'Görsel URL (Opsiyonel)',
+                            icon: Icons.image,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _guideNameController,
+                            label: 'Rehber Adı (Opsiyonel)',
+                            icon: Icons.person,
+                          ),
+
+                          const SizedBox(height: 20),
+                          _buildSectionTitle('Çıkış Takvimi'),
+                          const SizedBox(height: 8),
+                          _buildDepartureDaysSelector(),
+                          const SizedBox(height: 12),
+                          _buildSelectedDatesSection(),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _departureTimeController,
+                            label: 'Çıkış Saati (ör: 09:00)',
+                            icon: Icons.access_time,
+                          ),
+
+                          const SizedBox(height: 20),
+                          _buildSectionTitle('Tur Programı'),
+                          const SizedBox(height: 8),
+                          _buildProgramSection(),
+
+                          const SizedBox(height: 20),
+                          _buildSectionTitle('Araç Bilgileri'),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _driverNameController,
+                            label: 'Şoför Adı',
+                            icon: Icons.drive_eta,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _driverPhoneController,
+                            label: 'Şoför Telefonu',
+                            icon: Icons.phone,
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _plateController,
+                                  label: 'Plaka',
+                                  icon: Icons.confirmation_number,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _busCapacityController,
+                                  label: 'Araç Kapasitesi',
+                                  icon: Icons.airline_seat_recline_normal,
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Submit Button
+                    ElevatedButton.icon(
+                      onPressed: _isLoading.value ? null : _submitTour,
+                      icon: const Icon(Icons.cloud_upload, color: Colors.white),
+                      label: const Text(
+                        'Turu Firestore\'a Ekle',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Log Alanı
+                    if (_logMessages.isNotEmpty) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildSectionTitle('İşlem Logları'),
+                          TextButton(
+                            onPressed: _logMessages.clear,
+                            child: const Text(
+                              'Temizle',
+                              style: TextStyle(color: AppColors.slate400, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 200,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.slate900,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.slate700),
+                        ),
+                        child: ListView.builder(
+                          itemCount: _logMessages.length,
+                          itemBuilder: (context, index) {
+                            final msg = _logMessages[index];
+                            final isError = msg.startsWith('❌');
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Text(
+                                msg,
+                                style: TextStyle(
+                                  color: isError ? AppColors.error : AppColors.success,
+                                  fontSize: 11,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
@@ -1150,7 +1144,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
               const Spacer(),
               if (_selectedDepartureDays.isNotEmpty)
                 GestureDetector(
-                  onTap: () => setState(() => _selectedDepartureDays.clear()),
+                  onTap: _selectedDepartureDays.clear,
                   child: const Text(
                     'Temizle',
                     style: TextStyle(color: AppColors.error, fontSize: 12),
@@ -1169,13 +1163,11 @@ class _TestTourScreenState extends State<TestTourScreen> {
 
               return GestureDetector(
                 onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedDepartureDays.remove(dayNum);
-                    } else {
-                      _selectedDepartureDays.add(dayNum);
-                    }
-                  });
+                  if (isSelected) {
+                    _selectedDepartureDays.remove(dayNum);
+                  } else {
+                    _selectedDepartureDays.add(dayNum);
+                  }
                 },
                 child: Container(
                   width: 44,
@@ -1243,7 +1235,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
               const Spacer(),
               if (_selectedDates.isNotEmpty)
                 GestureDetector(
-                  onTap: () => setState(_selectedDates.clear),
+                  onTap: _selectedDates.clear,
                   child: const Text(
                     'Temizle',
                     style: TextStyle(color: AppColors.error, fontSize: 12),
@@ -1304,7 +1296,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
 
   Widget _buildRegionDropdown() {
     return DropdownButtonFormField<String>(
-      value: _selectedRegion,
+      value: _selectedRegion.value,
       dropdownColor: AppColors.slate800,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
@@ -1332,7 +1324,7 @@ class _TestTourScreenState extends State<TestTourScreen> {
       }).toList(),
       onChanged: (value) {
         if (value != null) {
-          setState(() => _selectedRegion = value);
+          _selectedRegion.value = value;
         }
       },
     );

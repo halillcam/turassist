@@ -1,1114 +1,226 @@
-import 'dart:convert';
-import 'dart:math';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
-
-import '../models/announcement_model.dart';
+﻿import '../models/announcement_model.dart';
 import '../models/chat_model.dart';
 import '../models/ticket_model.dart';
 import '../models/tour_model.dart';
 import '../models/tour_program_model.dart';
 import '../models/user_model.dart';
+import 'auth_service.dart';
+import 'chat_service.dart';
+import 'ticket_service.dart';
+import 'tour_service.dart';
 
-class QrConsumeResult {
-  final bool success;
-  final String code;
-  final String message;
-  final String passengerName;
+// QrConsumeResult bu dosyayı import edenler için re-export edilir
+export 'ticket_service.dart' show QrConsumeResult;
 
-  const QrConsumeResult({
-    required this.success,
-    required this.code,
-    required this.message,
-    this.passengerName = '',
-  });
-}
-
+/// Firebase işlemleri için geriye dönük uyumlu facade sınıfı.
+///
+/// Bu sınıf, domain bazlı 4 ayrı servise delege ederek çalışır:
+/// - [AuthService]    Kimlik doğrulama ve kullanıcı işlemleri
+/// - [TourService]    Tur listeleme ve yönetimi
+/// - [TicketService]  Bilet oluşturma ve QR doğrulama
+/// - [ChatService]    Sohbet mesajları ve duyurular
+///
+/// ### Geliştirme notu
+/// Yeni yazılan controller ve servisler doğrudan ilgili domain
+/// servisini import etmelidir. Bu sınıf, eski kodların kademeli
+/// olarak güncellenmesi sürecinde ara katman görevi görür.
 class FirebaseService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthService _authService = AuthService();
+  final TourService _tourService = TourService();
+  final TicketService _ticketService = TicketService();
+  final ChatService _chatService = ChatService();
 
-  String _normalizeQrToken(String token) {
-    return token.trim().replaceAll('\n', '').replaceAll('\r', '');
-  }
+  //  AuthService delegates 
 
-  Map<String, dynamic>? _decodeQrPayload(String token) {
-    try {
-      var normalized = token.trim().replaceAll('\n', '').replaceAll('\r', '');
-      final mod = normalized.length % 4;
-      if (mod != 0) {
-        normalized = normalized.padRight(normalized.length + (4 - mod), '=');
-      }
-      final decoded = utf8.decode(base64Url.decode(normalized));
-      final payload = jsonDecode(decoded);
-      if (payload is Map<String, dynamic>) return payload;
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
+  /// Şu anki kullanıcının UID'sini döndürür.
+  String getCurrentUserId() => _authService.getCurrentUserId();
 
-  String _extractTicketIdFromToken(String token) {
-    final raw = token.trim();
-    if (raw.startsWith('tk_')) {
-      final parts = raw.split('_');
-      if (parts.length >= 3) {
-        return parts[1].trim();
-      }
-    }
+  /// Kullanıcı profilini Firestore'dan getirir.
+  Future<UserModel?> getUserProfile() => _authService.getUserProfile();
 
-    final payload = _decodeQrPayload(raw);
-    return payload?['ticketId']?.toString().trim() ?? '';
-  }
-
-  /// slotId'nin yyyy-MM-dd formatında bir tarih olup olmadığını kontrol eder.
-  bool _isDateSlotId(String slotId) {
-    if (slotId.length != 10) return false;
-    final regex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-    return regex.hasMatch(slotId);
-  }
-
-  /// Bugünün slotId formatı: yyyy-MM-dd
-  String _todaySlotId() {
-    final now = DateTime.now();
-    return '${now.year.toString().padLeft(4, '0')}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
-  }
-
-  // ==================== TOUR OPERATIONS ====================
-  // Aktif (silinmemiş) turları getirir
-  Future<List<TourModel>> getActiveTours() async {
-    try {
-      final snapshot = await _firestore
-          .collection('tours')
-          .where('isDeleted', isEqualTo: false)
-          .get();
-
-      return snapshot.docs.map(TourModel.fromFirestore).toList();
-    } catch (e) {
-      debugPrint('Error fetching tours: $e');
-      return [];
-    }
-  }
-
-  // Şehre göre filtreleme
-  Future<List<TourModel>> getToursByCity(String city) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tours')
-          .where('city', isEqualTo: city)
-          .where('isDeleted', isEqualTo: false)
-          .get();
-
-      return snapshot.docs.map(TourModel.fromFirestore).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // Tüm şehirleri getir [cite: 12]
-  Future<List<String>> getAllCities() async {
-    try {
-      final snapshot = await _firestore.collection('cities').get();
-      return snapshot.docs.map((doc) => doc['name'] as String).toList();
-    } catch (e) {
-      debugPrint('Error fetching cities: $e');
-      return [];
-    }
-  }
-
-  // Tur detayını ID'ye göre getir [cite: 13]
-  Future<TourModel?> getTourById(String tourId) async {
-    try {
-      final doc = await _firestore.collection('tours').doc(tourId).get();
-      if (doc.exists) {
-        return TourModel.fromFirestore(doc);
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error fetching tour: $e');
-      return null;
-    }
-  }
-
-  // Rehbere atanmış aktif turu getir
-  Future<TourModel?> getAssignedTourForGuide(String guideId) async {
-    try {
-      if (guideId.trim().isEmpty) return null;
-
-      final snapshot = await _firestore
-          .collection('tours')
-          .where('guideId', isEqualTo: guideId)
-          .where('isDeleted', isEqualTo: false)
-          .get();
-
-      if (snapshot.docs.isEmpty) return null;
-
-      final tours = snapshot.docs.map(TourModel.fromFirestore).toList();
-      tours.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      return tours.first;
-    } catch (e) {
-      debugPrint('Error fetching assigned guide tour: $e');
-      return null;
-    }
-  }
-
-  // Tur programını getir (order alanına göre sıralı)
-  Future<List<TourProgramDay>> getTourProgram(String tourId) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tours')
-          .doc(tourId)
-          .collection('program')
-          .orderBy('order', descending: false)
-          .get();
-
-      return snapshot.docs.map(TourProgramDay.fromFirestore).toList();
-    } catch (e) {
-      debugPrint('Error fetching tour program: $e');
-      return [];
-    }
-  }
-
-  // Turu güncelle [cite: 32]
-  Future<void> updateTour(String tourId, TourModel tour) async {
-    try {
-      await _firestore.collection('tours').doc(tourId).update(tour.toJson());
-    } catch (e) {
-      debugPrint('Error updating tour: $e');
-    }
-  }
-
-  // Tur katılımcılarını getir [cite: 21, 32]
-  Future<List<Map<String, dynamic>>> getTourParticipants(String tourId) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tickets')
-          .where('tourId', isEqualTo: tourId)
-          .get();
-
-      final participants = await Future.wait(
-        snapshot.docs.map((doc) async {
-          final data = doc.data();
-          final status = data['status']?.toString().toLowerCase() ?? '';
-          if (status == 'cancelled') return null;
-
-          final userId = data['userId']?.toString().trim() ?? '';
-          final ticketName = data['passengerName']?.toString().trim() ?? '';
-          final tcNo = data['tcNo']?.toString().trim() ?? '';
-
-          String resolvedName = ticketName;
-          if (resolvedName.isEmpty && userId.isNotEmpty) {
-            final userDoc = await _firestore.collection('users').doc(userId).get();
-            final userData = userDoc.data();
-            final profileName = userData?['fullName']?.toString().trim() ?? '';
-            final email = userData?['email']?.toString().trim() ?? '';
-            final emailName = email.contains('@') ? email.split('@').first.trim() : '';
-
-            resolvedName = profileName.isNotEmpty
-                ? profileName
-                : (emailName.isNotEmpty ? emailName : resolvedName);
-
-            if (resolvedName.isNotEmpty) {
-              await doc.reference.update({'passengerName': resolvedName});
-            }
-          }
-
-          return {'id': doc.id, ...data, 'passengerName': resolvedName, 'tcNo': tcNo};
-        }),
-      );
-
-      return participants.whereType<Map<String, dynamic>>().toList();
-    } catch (e) {
-      debugPrint('Error fetching tour participants: $e');
-      return [];
-    }
-  }
-
-  // Turu bitir [cite: 6, 21, 32]
-  Future<void> finishTour(String tourId, String guideId) async {
-    try {
-      // Tur bitirme talebi oluştur (Admin panele gidecek)
-      await _firestore.collection('tours').doc(tourId).update({
-        'status': 'finish_requested',
-        'finishRequestedBy': guideId,
-        'finishRequestedAt': FieldValue.serverTimestamp(),
-      });
-
-      // Bu turun tüm QR token'larını pasif hale getir
-      final tickets = await _firestore
-          .collection('tickets')
-          .where('tourId', isEqualTo: tourId)
-          .get();
-
-      for (var doc in tickets.docs) {
-        await doc.reference.update({'qrToken': null, 'isScanned': true});
-      }
-    } catch (e) {
-      debugPrint('Error finishing tour: $e');
-    }
-  }
-
-  // ==================== TICKET & QR OPERATIONS ====================
-
-  /// Belirli bir tur + slot (tarih) için satılmış aktif bilet sayısını döndürür.
-  /// İptal edilmiş biletler sayılmaz.
-  Future<int> getSlotTicketCount(String tourId, String slotId) async {
-    try {
-      final snap = await _firestore
-          .collection('tickets')
-          .where('tourId', isEqualTo: tourId)
-          .where('slotId', isEqualTo: slotId)
-          .where('status', whereIn: ['active', 'checked_in'])
-          .get();
-      return snap.docs.length;
-    } catch (e) {
-      debugPrint('getSlotTicketCount HATA: $e');
-      return 0;
-    }
-  }
-
-  /// Birden fazla slot için toplu kapasite sorgulama.
-  /// Dönen map: slotId → satılmış bilet sayısı.
-  Future<Map<String, int>> getSlotTicketCounts(String tourId, List<String> slotIds) async {
-    final result = <String, int>{};
-    // Firestore 'in' sorgusu max 10 değer alır, parçalar halinde sorgula
-    // NOT: Tek sorguda sadece bir `whereIn` kullanılabilir, bu yüzden status
-    // filtrelemesi client-side yapılır.
-    for (var i = 0; i < slotIds.length; i += 10) {
-      final chunk = slotIds.sublist(i, i + 10 > slotIds.length ? slotIds.length : i + 10);
-      try {
-        final snap = await _firestore
-            .collection('tickets')
-            .where('tourId', isEqualTo: tourId)
-            .where('slotId', whereIn: chunk)
-            .get();
-        for (final doc in snap.docs) {
-          final data = doc.data();
-          final status = data['status']?.toString().toLowerCase() ?? '';
-          if (status == 'cancelled' || status == 'completed') continue;
-          final sid = data['slotId']?.toString() ?? '';
-          result[sid] = (result[sid] ?? 0) + 1;
-        }
-      } catch (e) {
-        debugPrint('getSlotTicketCounts HATA (chunk $i): $e');
-      }
-    }
-    return result;
-  }
-
-  // Bilet oluşturma [cite: 15, 28]
-  Future<({String ticketId, String qrToken})> createTicket(TicketModel ticket) async {
-    try {
-      debugPrint('createTicket: userId=${ticket.userId}, tourId=${ticket.tourId}');
-      debugPrint('createTicket: toJson=${ticket.toJson()}');
-
-      final docRef = _firestore.collection('tickets').doc();
-      final tourRef = _firestore.collection('tours').doc(ticket.tourId);
-      final userRef = _firestore.collection('users').doc(ticket.userId);
-      final qrToken = await generateQRToken(
-        ticketId: docRef.id,
-        tourId: ticket.tourId,
-        userId: ticket.userId,
-      );
-
-      final payload = ticket.toJson();
-      payload['qrToken'] = qrToken;
-
-      // Kritik yol: müşteri satın alımı için önce sadece bilet kaydı garanti edilir.
-      await docRef.set(payload);
-
-      // Ek ilişki alanları (Rules izin verirse) best-effort olarak güncellenir.
-      try {
-        await tourRef.set({
-          'registeredUserIds': FieldValue.arrayUnion([ticket.userId]),
-        }, SetOptions(merge: true));
-      } catch (e) {
-        debugPrint('createTicket: tour registeredUserIds güncellenemedi (izin/rules): $e');
-      }
-
-      try {
-        await userRef.set({
-          'purchasedTourIds': FieldValue.arrayUnion([ticket.tourId]),
-        }, SetOptions(merge: true));
-      } catch (e) {
-        debugPrint('createTicket: user purchasedTourIds güncellenemedi (izin/rules): $e');
-      }
-
-      debugPrint('createTicket: BAŞARILI → docId=${docRef.id}');
-      return (ticketId: docRef.id, qrToken: qrToken);
-    } catch (e) {
-      debugPrint('createTicket: HATA → $e');
-      throw Exception("Bilet oluşturma başarısız: $e");
-    }
-  }
-
-  // Kullanıcı profilini getir
-  Future<UserModel?> getUserProfile() async {
-    try {
-      final userId = _auth.currentUser?.uid ?? '';
-      if (userId.isEmpty) return null;
-
-      final doc = await _firestore.collection('users').doc(userId).get();
-      if (!doc.exists) return null;
-      return UserModel.fromFirestore(doc);
-    } catch (e) {
-      debugPrint('getUserProfile Error: $e');
-      return null;
-    }
-  }
-
-  // Kullanıcının biletlerini getir [cite: 15]
-  Future<List<TicketModel>> getUserTickets() async {
-    try {
-      final userId = _auth.currentUser?.uid ?? '';
-      debugPrint('getUserTickets: userId=$userId');
-      if (userId.isEmpty) {
-        debugPrint('getUserTickets: HATA — userId boş!');
-        throw Exception("Kullanıcı giriş yapmamış");
-      }
-
-      debugPrint('getUserTickets: Firestore sorgusu çalıştırılıyor...');
-      final snapshot = await _firestore
-          .collection('tickets')
-          .where('userId', isEqualTo: userId)
-          .get();
-
-      debugPrint('getUserTickets: ${snapshot.docs.length} belge bulundu');
-      for (final doc in snapshot.docs) {
-        debugPrint('  DOC: id=${doc.id}, data=${doc.data()}');
-      }
-
-      final tickets = snapshot.docs.map(TicketModel.fromFirestore).toList();
-      // Composite index gerekmeden bellekte sırala
-      tickets.sort((a, b) => b.purchaseDate.compareTo(a.purchaseDate));
-      return tickets;
-    } catch (e) {
-      debugPrint('getUserTickets: HATA → $e');
-      return [];
-    }
-  }
-
-  /// Kullanıcının biletlerini gerçek zamanlı dinler.
-  ///
-  /// QR tarama sonrası `isScanned` / `status` değişikliklerini
-  /// anında UI'a yansıtmak için kullanılır.
-  Stream<List<TicketModel>> getUserTicketsStream() {
-    final userId = _auth.currentUser?.uid ?? '';
-    if (userId.isEmpty) return const Stream.empty();
-
-    return _firestore.collection('tickets').where('userId', isEqualTo: userId).snapshots().map((
-      snapshot,
-    ) {
-      final tickets = snapshot.docs.map(TicketModel.fromFirestore).toList();
-      tickets.sort((a, b) => b.purchaseDate.compareTo(a.purchaseDate));
-      return tickets;
-    });
-  }
-
-  // QR Token Gömme - Unique token oluştur [cite: 18, 32]
-  Future<String> generateQRToken({
-    required String ticketId,
-    required String tourId,
-    required String userId,
-  }) async {
-    try {
-      final random = Random.secure();
-      final nonce =
-          '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}${random.nextInt(1 << 32).toRadixString(36)}';
-      return 'tk_${ticketId}_$nonce';
-    } catch (e) {
-      debugPrint('QR Token Generation Error: $e');
-      throw Exception("QR token oluşturulamadı");
-    }
-  }
-
-  // QR Token'ı Bilete Kaydet [cite: 18, 32]
-  Future<void> updateTicketQRToken(String ticketId, String qrToken) async {
-    try {
-      await _firestore.collection('tickets').doc(ticketId).update({'qrToken': qrToken});
-    } catch (e) {
-      debugPrint('QR Token Update Error: $e');
-      throw Exception('QR token kaydedilemedi: $e');
-    }
-  }
-
-  // Rehberin QR okutma işlemi (Security Rules uyumlu: isScanned & scannedAt)
-  Future<bool> updateTicketQRStatus(String ticketId) async {
-    try {
-      final ref = _firestore.collection('tickets').doc(ticketId);
-      return await _firestore.runTransaction((tx) async {
-        final snapshot = await tx.get(ref);
-        if (!snapshot.exists) return false;
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final alreadyScanned = data['isScanned'] == true;
-        final status = data['status']?.toString().toLowerCase() ?? '';
-
-        if (alreadyScanned || status == 'cancelled' || status == 'completed') {
-          return false;
-        }
-
-        tx.update(ref, {
-          'isScanned': true,
-          'status': 'checked_in',
-          'scannedAt': FieldValue.serverTimestamp(),
-          'qrToken': null,
-        });
-
-        return true;
-      });
-    } catch (e) {
-      debugPrint('QR Scan Error: $e');
-      return false;
-    }
-  }
-
-  // QR token ile bilet doğrula + tek seferlik check-in yap (eski uyumlu bool API)
-  Future<bool> consumeTicketByQrToken({
-    required String qrToken,
-    required String expectedTourId,
-  }) async {
-    final result = await consumeTicketByQrTokenDetailed(
-      qrToken: qrToken,
-      expectedTourId: expectedTourId,
-    );
-    return result.success;
-  }
-
-  // QR token ile bilet doğrula + tek seferlik check-in yap (detaylı sonuç)
-  Future<QrConsumeResult> consumeTicketByQrTokenDetailed({
-    required String qrToken,
-    required String expectedTourId,
-    String? expectedDate,
-  }) async {
-    final normalizedToken = _normalizeQrToken(qrToken);
-    final payloadTicketId = _extractTicketIdFromToken(qrToken);
-
-    debugPrint('consumeTicket: normalizedToken=$normalizedToken');
-    debugPrint('consumeTicket: payloadTicketId=$payloadTicketId');
-    debugPrint('consumeTicket: expectedTourId=$expectedTourId');
-
-    try {
-      if (normalizedToken.isEmpty || expectedTourId.trim().isEmpty) {
-        return const QrConsumeResult(
-          success: false,
-          code: 'invalid_input',
-          message: 'QR verisi veya tur bilgisi boş.',
-        );
-      }
-
-      // ── STRATEJİ 1: Token'dan ticketId çıkararak doğrudan belge erişimi ──
-      // Firestore Security Rules rehberin koleksiyonu sorgulamasını engellese bile
-      // tek belge erişimi genelde izinlidir veya fallback ile güncellenebilir.
-      if (payloadTicketId.isNotEmpty) {
-        debugPrint('consumeTicket: Strateji 1 — doğrudan ticketId ile erişim: $payloadTicketId');
-        try {
-          final directRef = _firestore.collection('tickets').doc(payloadTicketId);
-          // Transaction String? döndürür: null = başarısız, non-null = yolcu adı
-          final txPassengerName = await _firestore.runTransaction<String?>((tx) async {
-            final snapshot = await tx.get(directRef);
-            if (!snapshot.exists) {
-              debugPrint('consumeTicket: ticketId=$payloadTicketId bulunamadı');
-              return null;
-            }
-
-            final data = snapshot.data() as Map<String, dynamic>;
-            final alreadyScanned = data['isScanned'] == true;
-            final status = data['status']?.toString().toLowerCase() ?? '';
-            final tourId = data['tourId']?.toString() ?? '';
-            final tokenInDb = data['qrToken']?.toString() ?? '';
-            final normalizedInDb = _normalizeQrToken(tokenInDb);
-            final pName = data['passengerName']?.toString() ?? '';
-            final slotId = data['slotId']?.toString() ?? '';
-
-            debugPrint(
-              'consumeTicket: DB tourId=$tourId, tokenInDb=$tokenInDb, isScanned=$alreadyScanned, status=$status, passenger=$pName, slotId=$slotId',
-            );
-
-            if (tourId.trim() != expectedTourId.trim()) {
-              debugPrint(
-                'consumeTicket: Tur eşleşmedi. ticketTourId=$tourId expectedTourId=$expectedTourId',
-              );
-              return null;
-            }
-            if (normalizedInDb != normalizedToken) {
-              debugPrint(
-                'consumeTicket: DB token uyuşmadı. normalizedInDb=$normalizedInDb normalizedToken=$normalizedToken',
-              );
-              return null;
-            }
-            if (alreadyScanned || status == 'cancelled' || status == 'completed') {
-              debugPrint(
-                'consumeTicket: Bilet artık geçersiz. alreadyScanned=$alreadyScanned status=$status',
-              );
-              return null;
-            }
-
-            // ── Tarih doğrulama: expectedDate verilmişse slotId ile karşılaştır ──
-            // expectedDate yoksa tarih kontrolü yapılmaz (rehber istediği zaman tarayabilir)
-            if (expectedDate != null && _isDateSlotId(slotId)) {
-              if (slotId != expectedDate) {
-                debugPrint(
-                  'consumeTicket: Tarih uyuşmazlığı! slotId=$slotId expected=$expectedDate',
-                );
-                return '__DATE_MISMATCH__$slotId';
-              }
-            }
-
-            tx.update(directRef, {
-              'isScanned': true,
-              'status': 'checked_in',
-              'scannedAt': FieldValue.serverTimestamp(),
-              'qrToken': null,
-            });
-            return pName;
-          });
-
-          if (txPassengerName != null) {
-            // Tarih uyuşmazlığı sentinel kontrolü
-            if (txPassengerName.startsWith('__DATE_MISMATCH__')) {
-              final ticketSlot = txPassengerName.replaceFirst('__DATE_MISMATCH__', '');
-              debugPrint(
-                'consumeTicket: Tarih uyuşmazlığı — bilet=$ticketSlot atanmış=$expectedDate',
-              );
-              return QrConsumeResult(
-                success: false,
-                code: 'date_mismatch',
-                message: 'Bu bilet $ticketSlot tarihli. Sizin atanmış tarihiniz $expectedDate.',
-              );
-            }
-            debugPrint('consumeTicket: Strateji 1 BAŞARILI ✓ passenger=$txPassengerName');
-            return QrConsumeResult(
-              success: true,
-              code: 'ok',
-              message: 'QR doğrulandı.',
-              passengerName: txPassengerName,
-            );
-          }
-
-          // Transaction false döndü ama hata yok — bilet geçersiz
-          return const QrConsumeResult(
-            success: false,
-            code: 'invalid_or_used',
-            message: 'QR geçersiz, farklı tura ait veya daha önce kullanılmış.',
-          );
-        } on FirebaseException catch (e) {
-          if (e.code == 'permission-denied') {
-            debugPrint('consumeTicket: Strateji 1 permission-denied, fallback deneniyor...');
-            // İzin hatası — Strateji 2'ye düş
-          } else {
-            rethrow;
-          }
-        }
-      }
-
-      // ── STRATEJİ 2: qrToken alanı ile sorgu ──
-      debugPrint('consumeTicket: Strateji 2 — qrToken alanı ile koleksiyon sorgusu');
-      QuerySnapshot<Map<String, dynamic>> query = await _firestore
-          .collection('tickets')
-          .where('qrToken', isEqualTo: normalizedToken)
-          .limit(1)
-          .get();
-
-      DocumentReference<Map<String, dynamic>>? ref;
-      if (query.docs.isNotEmpty) {
-        ref = query.docs.first.reference;
-      }
-
-      // Eşleşme yoksa ham token ile dene
-      if (ref == null) {
-        query = await _firestore
-            .collection('tickets')
-            .where('qrToken', isEqualTo: qrToken.trim())
-            .limit(1)
-            .get();
-        if (query.docs.isNotEmpty) {
-          ref = query.docs.first.reference;
-        }
-      }
-
-      if (ref == null) {
-        debugPrint('consumeTicket: Token bulunamadı (tüm stratejiler denendi)');
-        return const QrConsumeResult(
-          success: false,
-          code: 'token_not_found',
-          message: 'QR token bulunamadı.',
-        );
-      }
-
-      final ticketRef = ref;
-      final txPassengerName2 = await _firestore.runTransaction<String?>((tx) async {
-        final snapshot = await tx.get(ticketRef);
-        if (!snapshot.exists) return null;
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final alreadyScanned = data['isScanned'] == true;
-        final status = data['status']?.toString().toLowerCase() ?? '';
-        final tourId = data['tourId']?.toString() ?? '';
-        final pName = data['passengerName']?.toString() ?? '';
-        final slotId = data['slotId']?.toString() ?? '';
-
-        if (tourId.trim() != expectedTourId.trim()) {
-          debugPrint('consumeTicket: Tur eşleşmedi (sorgu yolu). ticketTourId=$tourId');
-          return null;
-        }
-        if (alreadyScanned || status == 'cancelled' || status == 'completed') {
-          debugPrint('consumeTicket: Bilet artık geçersiz (sorgu yolu).');
-          return null;
-        }
-
-        // ── Tarih doğrulama: expectedDate verilmişse slotId ile karşılaştır ──
-        if (expectedDate != null && _isDateSlotId(slotId)) {
-          if (slotId != expectedDate) {
-            debugPrint(
-              'consumeTicket: Tarih uyuşmazlığı (sorgu yolu)! slotId=$slotId expected=$expectedDate',
-            );
-            return '__DATE_MISMATCH__$slotId';
-          }
-        }
-
-        tx.update(ticketRef, {
-          'isScanned': true,
-          'status': 'checked_in',
-          'scannedAt': FieldValue.serverTimestamp(),
-          'qrToken': null,
-        });
-        return pName;
-      });
-
-      if (txPassengerName2 != null) {
-        // Tarih uyuşmazlığı sentinel kontrolü
-        if (txPassengerName2.startsWith('__DATE_MISMATCH__')) {
-          final ticketSlot = txPassengerName2.replaceFirst('__DATE_MISMATCH__', '');
-          return QrConsumeResult(
-            success: false,
-            code: 'date_mismatch',
-            message: 'Bu bilet $ticketSlot tarihli. Sizin atanmış tarihiniz $expectedDate.',
-          );
-        }
-        debugPrint('consumeTicket: Strateji 2 BAŞARILI ✓ passenger=$txPassengerName2');
-        return QrConsumeResult(
-          success: true,
-          code: 'ok',
-          message: 'QR doğrulandı.',
-          passengerName: txPassengerName2,
-        );
-      }
-
-      return const QrConsumeResult(
-        success: false,
-        code: 'invalid_or_used',
-        message: 'QR geçersiz, farklı tura ait veya daha önce kullanılmış.',
-      );
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') {
-        debugPrint('consumeTicket: permission-denied, blind update fallback deneniyor');
-        return _consumeTicketByPayloadNoRead(
-          ticketId: payloadTicketId,
-          payloadTourId: '',
-          expectedTourId: expectedTourId,
-        );
-      }
-
-      debugPrint('QR Token Consume FirebaseError: ${e.code} ${e.message}');
-      return QrConsumeResult(
-        success: false,
-        code: e.code,
-        message: 'Firebase hatası: ${e.message ?? e.code}',
-      );
-    } catch (e) {
-      debugPrint('QR Token Consume Error: $e');
-      return QrConsumeResult(
-        success: false,
-        code: 'unknown_error',
-        message: 'Beklenmeyen hata: $e',
-      );
-    }
-  }
-
-  Future<QrConsumeResult> _consumeTicketByPayloadNoRead({
-    required String ticketId,
-    required String payloadTourId,
-    required String expectedTourId,
-  }) async {
-    try {
-      if (ticketId.trim().isEmpty) {
-        return const QrConsumeResult(
-          success: false,
-          code: 'ticket_id_missing',
-          message: 'QR içinde ticketId bulunamadı.',
-        );
-      }
-      if (payloadTourId.trim().isNotEmpty && payloadTourId.trim() != expectedTourId.trim()) {
-        return const QrConsumeResult(
-          success: false,
-          code: 'tour_mismatch_payload',
-          message: 'QR farklı tura ait görünüyor.',
-        );
-      }
-
-      await _firestore.collection('tickets').doc(ticketId).update({
-        'isScanned': true,
-        'status': 'checked_in',
-        'scannedAt': FieldValue.serverTimestamp(),
-        'qrToken': null,
-      });
-
-      return const QrConsumeResult(
-        success: true,
-        code: 'ok_no_read_fallback',
-        message: 'QR doğrulandı (fallback).',
-      );
-    } on FirebaseException catch (e) {
-      debugPrint('no-read fallback failed: ${e.code} ${e.message}');
-      return QrConsumeResult(
-        success: false,
-        code: 'fallback_${e.code}',
-        message: 'Fallback hatası: ${e.message ?? e.code}',
-      );
-    } catch (e) {
-      debugPrint('no-read fallback error: $e');
-      return QrConsumeResult(
-        success: false,
-        code: 'fallback_unknown_error',
-        message: 'Fallback beklenmeyen hata: $e',
-      );
-    }
-  }
-
-  Future<bool> updateTicketStatus(String ticketId, String newStatus) async {
-    try {
-      await _firestore.collection('tickets').doc(ticketId).update({
-        'status': newStatus,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      return true;
-    } catch (e) {
-      debugPrint('Ticket Status Update Error: $e');
-      return false;
-    }
-  }
-
-  // ==================== CHAT & ANNOUNCEMENT ====================
-  // Mesaj gönderimi (Sadece tourId ve ChatModel alır)
-  Future<void> sendChatMessage(String tourId, ChatModel message) async {
-    debugPrint('═══ SEND_MSG: Başladı ═══');
-    debugPrint('SEND_MSG: tourId=$tourId');
-    debugPrint('SEND_MSG: senderId=${message.senderId}');
-    debugPrint('SEND_MSG: senderName=${message.senderName}');
-    debugPrint('SEND_MSG: text=${message.text}');
-
-    final ref = _firestore.collection('tours').doc(tourId).collection('messages');
-    debugPrint('SEND_MSG: Yazılıyor → ${ref.path}');
-
-    final docRef = await ref.add(message.toJson());
-    debugPrint('SEND_MSG: BAŞARILI ✓ docId=${docRef.id}');
-    debugPrint('═══ SEND_MSG: Tamamlandı ═══');
-  }
-
-  // Mesajları dinle (Stream)
-  Stream<List<ChatModel>> getChatMessages(String tourId) {
-    debugPrint('getChatMessages: Stream başlatılıyor → tours/$tourId/messages');
-    return _firestore
-        .collection('tours')
-        .doc(tourId)
-        .collection('messages')
-        .orderBy('createdAt', descending: false)
-        .snapshots()
-        .map((snapshot) {
-          debugPrint('getChatMessages: snapshot → ${snapshot.docs.length} mesaj');
-          return snapshot.docs.map(ChatModel.fromFirestore).toList();
-        });
-  }
-
-  // Tüm mesajları getir (olmayan fonksiyon için) [cite: 6]
-  Future<List<ChatModel>> getAllChatMessages(String tourId) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tours')
-          .doc(tourId)
-          .collection('messages')
-          .orderBy('createdAt', descending: false)
-          .get();
-
-      return snapshot.docs.map(ChatModel.fromFirestore).toList();
-    } catch (e) {
-      debugPrint('Error fetching chat messages: $e');
-      return [];
-    }
-  }
-
-  // Mesaj sil [cite: 6]
-  Future<void> deleteChatMessage(String tourId, String messageId) async {
-    try {
-      await _firestore
-          .collection('tours')
-          .doc(tourId)
-          .collection('messages')
-          .doc(messageId)
-          .delete();
-    } catch (e) {
-      debugPrint('Error deleting message: $e');
-    }
-  }
-
-  // Duyuru oluşturma
-  Future<void> createAnnouncement(String tourId, AnnouncementModel announcement) async {
-    try {
-      await _firestore
-          .collection('tours')
-          .doc(tourId)
-          .collection('announcements')
-          .add(announcement.toJson());
-    } catch (e) {
-      debugPrint('Announcement Error: $e');
-      throw Exception('Duyuru kaydedilemedi: $e');
-    }
-  }
-
-  // Duyuruları dinle (Stream)
-  Stream<List<AnnouncementModel>> getAnnouncements(String tourId) {
-    return _firestore
-        .collection('tours')
-        .doc(tourId)
-        .collection('announcements')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs.map(AnnouncementModel.fromFirestore).toList();
-        });
-  }
-
-  // Customer için fallback: kendi bildirimlerinden tur duyurularını dinle
-  Stream<List<AnnouncementModel>> getUserTourNotifications(String userId, String tourId) {
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('notifications')
-        .where('tourId', isEqualTo: tourId)
-        .snapshots()
-        .map((snapshot) {
-          final list = snapshot.docs.map((doc) {
-            final data = doc.data();
-            return AnnouncementModel(
-              id: doc.id,
-              notification: data['message']?.toString() ?? '',
-              createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-            );
-          }).toList();
-
-          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return list;
-        });
-  }
-
-  // Tüm duyuruları getir [cite: 25]
-  Future<List<AnnouncementModel>> getAllAnnouncements(String tourId) async {
-    try {
-      final snapshot = await _firestore
-          .collection('tours')
-          .doc(tourId)
-          .collection('announcements')
-          .orderBy('createdAt', descending: true)
-          .get();
-
-      return snapshot.docs.map(AnnouncementModel.fromFirestore).toList();
-    } catch (e) {
-      debugPrint('Error fetching announcements: $e');
-      return [];
-    }
-  }
-
-  // Duyuru sil [cite: 25]
-  Future<void> deleteAnnouncement(String tourId, String announcementId) async {
-    try {
-      await _firestore
-          .collection('tours')
-          .doc(tourId)
-          .collection('announcements')
-          .doc(announcementId)
-          .delete();
-    } catch (e) {
-      debugPrint('Error deleting announcement: $e');
-    }
-  }
-
-  // Tur katılımcılarına bildirim gönder [cite: 21, 25]
-  Future<void> sendNotificationToTourParticipants(String tourId, String message) async {
-    try {
-      // QR okutan katılımcı biletlerini al
-      final tickets = await _firestore
-          .collection('tickets')
-          .where('tourId', isEqualTo: tourId)
-          .where('isScanned', isEqualTo: true)
-          .get();
-
-      final uniqueUserIds = <String>{};
-      for (final doc in tickets.docs) {
-        final rawUserId = doc.data()['userId'];
-        final userId = rawUserId?.toString().trim() ?? '';
-        if (userId.isNotEmpty) {
-          uniqueUserIds.add(userId);
-        }
-      }
-
-      // Her kullanıcı için tek bildirim kaydı oluştur
-      for (final userId in uniqueUserIds) {
-        await _firestore.collection('users').doc(userId).collection('notifications').add({
-          'title': 'Tur Bildirim',
-          'message': message,
-          'tourId': tourId,
-          'scope': 'checked_in_only',
-          'createdAt': FieldValue.serverTimestamp(),
-          'isRead': false,
-        });
-      }
-    } catch (e) {
-      debugPrint('Error sending notification: $e');
-      throw Exception('Katılımcı bildirimleri kaydedilemedi: $e');
-    }
-  }
-
-  // ==================== AUTH & AUTHORIZATION ====================
-  // Kayıt ol - Mobile App'te sadece customer role'ü olabilir [cite: 12, 40]
+  /// Yeni müşteri hesabı oluşturur.
   Future<UserModel?> registerUser({
     required String email,
     required String password,
     required String name,
     required String surname,
-  }) async {
-    try {
-      final cred = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      final userId = cred.user!.uid;
+  }) => _authService.registerUser(
+    email: email,
+    password: password,
+    name: name,
+    surname: surname,
+  );
 
-      final newUser = UserModel(
-        uid: userId,
-        fullName: '$name $surname',
-        email: email,
-        phone: '',
-        role: 'customer', // Mobile App'te sadece customer olabilir
-        companyId: '',
-        registeredCompanies: [],
-        tcNo: '',
-        selectedCity: '',
-        profileImage: null,
-        isDeleted: false,
-        createdAt: DateTime.now(),
-      );
+  /// E-posta ve şifre ile giriş yapar; admin rolü kontrolü uygular.
+  Future<UserModel?> loginAndCheckAuth(
+    String email,
+    String password,
+    String companyId,
+  ) => _authService.loginAndCheckAuth(email, password, companyId);
 
-      await _firestore.collection('users').doc(userId).set(newUser.toJson());
-      return newUser;
-    } catch (e) {
-      debugPrint('Registration Error: $e');
-      throw Exception("Kayıt başarısız: ${e.toString()}");
-    }
-  }
+  /// Tur sorumlusu (rehber) girişi.
+  Future<UserModel?> guideLogin(String guideId, String password) =>
+      _authService.guideLogin(guideId, password);
 
-  // Çıkış yap [cite: 12]
-  Future<void> logout() async {
-    try {
-      await _auth.signOut();
-    } catch (e) {
-      debugPrint('Logout Error: $e');
-      throw Exception("Çıkış başarısız");
-    }
-  }
+  /// Firebase oturumunu kapatır.
+  Future<void> logout() => _authService.logout();
 
-  // Şifre sıfırla [cite: 12]
-  Future<void> resetPassword(String email) async {
-    try {
-      await _auth.sendPasswordResetEmail(email: email);
-    } catch (e) {
-      debugPrint('Password Reset Error: $e');
-      throw Exception("Şifre sıfırlama hatası");
-    }
-  }
+  /// Şifre sıfırlama e-postası gönderir.
+  Future<void> resetPassword(String email) => _authService.resetPassword(email);
 
-  // SaaS Yetki Kontrolü
-  Future<bool> isAuthorizedForCompany(String userId, String companyId) async {
-    final userDoc = await _firestore.collection('users').doc(userId).get();
-    if (!userDoc.exists) return false;
+  /// Kullanıcının belirtilen şirkete erişim yetkisini doğrular.
+  Future<bool> isAuthorizedForCompany(String userId, String companyId) =>
+      _authService.isAuthorizedForCompany(userId, companyId);
 
-    final user = UserModel.fromFirestore(userDoc);
-    if (user.role == 'super_admin') return true;
-    return user.registeredCompanies.contains(companyId);
-  }
+  //  TourService delegates 
 
-  // Giriş ve Yetki Kontrolü
-  Future<UserModel?> loginAndCheckAuth(String email, String password, String companyId) async {
-    final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
-    final userId = cred.user!.uid;
+  /// Silinmemiş tüm aktif turları getirir.
+  Future<List<TourModel>> getActiveTours() => _tourService.getActiveTours();
 
-    final doc = await _firestore.collection('users').doc(userId).get();
-    final user = UserModel.fromFirestore(doc);
+  /// Belirtilen şehre ait turları getirir.
+  Future<List<TourModel>> getToursByCity(String city) =>
+      _tourService.getToursByCity(city);
 
-    // Mobile App'te SADECE customer, guest, guide olabilir
-    // Admin/Super Admin web panel'de (ayrı proje) [cite: 40, 42]
-    if (user.role == 'admin' || user.role == 'super_admin') {
-      await _auth.signOut();
-      throw Exception(
-        "Admin hesaplar web panelinde kullanılır. Lütfen web admin panelini ziyaret edin.",
-      );
-    }
+  /// Tüm şehir isimlerini getirir.
+  Future<List<String>> getAllCities() => _tourService.getAllCities();
 
-    return user;
-  }
+  /// ID'ye göre tur getirir.
+  Future<TourModel?> getTourById(String tourId) =>
+      _tourService.getTourById(tourId);
 
-  // Şu anki kullanıcının ID'sini getir
-  String getCurrentUserId() {
-    return _auth.currentUser?.uid ?? '';
-  }
+  /// Rehbere atanmış aktif turu getirir.
+  Future<TourModel?> getAssignedTourForGuide(String guideId) =>
+      _tourService.getAssignedTourForGuide(guideId);
 
-  // ==================== GUIDE/TUR SORUMLUSU GIRIŞI ====================
-  // Tur Sorumlusu Girişi - Web Admin Panel'de oluşturulan ID/PW ile [cite: 18, 21]
-  // Web Admin Panel'de şirket admin'i tur sorumlusuna ID/PW oluşturur
-  // Mobile App'te tur sorumlusu sadece giriş yapıyor
-  Future<UserModel?> guideLogin(String guideId, String password) async {
-    try {
-      // Web Admin Panel'de oluşturulan guide record'ı getir
-      final doc = await _firestore.collection('guides').doc(guideId).get();
+  /// Tur programını sıralı getirir.
+  Future<List<TourProgramDay>> getTourProgram(String tourId) =>
+      _tourService.getTourProgram(tourId);
 
-      if (!doc.exists) {
-        throw Exception("Tur sorumlusu bulunamadı");
-      }
+  /// Turu Firestore'da günceller.
+  Future<void> updateTour(String tourId, TourModel tour) =>
+      _tourService.updateTour(tourId, tour);
 
-      final data = doc.data() as Map<String, dynamic>;
-      final storedPassword = data['password'] as String;
+  /// Tur katılımcılarını getirir.
+  Future<List<Map<String, dynamic>>> getTourParticipants(String tourId) =>
+      _tourService.getTourParticipants(tourId);
 
-      // Şifre kontrolü
-      if (storedPassword != password) {
-        throw Exception("Şifre yanlış");
-      }
+  /// Tur bitirme talebi oluşturur.
+  Future<void> finishTour(String tourId, String guideId) =>
+      _tourService.finishTour(tourId, guideId);
 
-      final fullName = data['fullName']?.toString() ?? 'Tur Sorumlusu';
-      final email = data['email']?.toString() ?? '';
-      final phone = data['phone']?.toString() ?? '';
-      final companyId = data['companyId']?.toString() ?? '';
-      final isDeleted = data['isDeleted'] == true;
+  //  TicketService delegates 
 
-      return UserModel(
-        uid: doc.id,
-        fullName: fullName,
-        email: email,
-        phone: phone,
-        role: 'guide',
-        companyId: companyId,
-        registeredCompanies: List<String>.from(
-          (data['registeredCompanies'] as List?) ?? [if (companyId.trim().isNotEmpty) companyId],
-        ),
-        tcNo: data['tcNo']?.toString() ?? '',
-        selectedCity: data['selectedCity']?.toString() ?? '',
-        profileImage: data['profileImage']?.toString(),
-        isDeleted: isDeleted,
-        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      );
-    } catch (e) {
-      debugPrint('Guide Login Error: $e');
-      throw Exception(e.toString());
-    }
-  }
+  /// Tek slot için satılmış bilet sayısını döndürür.
+  Future<int> getSlotTicketCount(String tourId, String slotId) =>
+      _ticketService.getSlotTicketCount(tourId, slotId);
+
+  /// Birden fazla slot için toplu kapasite sorgular.
+  Future<Map<String, int>> getSlotTicketCounts(
+    String tourId,
+    List<String> slotIds,
+  ) => _ticketService.getSlotTicketCounts(tourId, slotIds);
+
+  /// Bilet oluşturur ve QR token döndürür.
+  Future<({String ticketId, String qrToken})> createTicket(TicketModel ticket) =>
+      _ticketService.createTicket(ticket);
+
+  /// Kullanıcının tüm biletlerini getirir.
+  Future<List<TicketModel>> getUserTickets() => _ticketService.getUserTickets();
+
+  /// Kullanıcı biletlerini gerçek zamanlı dinler.
+  Stream<List<TicketModel>> getUserTicketsStream() =>
+      _ticketService.getUserTicketsStream();
+
+  /// Benzersiz QR token üretir.
+  Future<String> generateQRToken({
+    required String ticketId,
+    required String tourId,
+    required String userId,
+  }) => _ticketService.generateQRToken(
+    ticketId: ticketId,
+    tourId: tourId,
+    userId: userId,
+  );
+
+  /// Bilete QR token yazar.
+  Future<void> updateTicketQRToken(String ticketId, String qrToken) =>
+      _ticketService.updateTicketQRToken(ticketId, qrToken);
+
+  /// Bilet ID'si ile QR okutma işlemi yapar.
+  Future<bool> updateTicketQRStatus(String ticketId) =>
+      _ticketService.updateTicketQRStatus(ticketId);
+
+  /// QR token ile check-in yapar; bool döner.
+  Future<bool> consumeTicketByQrToken({
+    required String qrToken,
+    required String expectedTourId,
+  }) => _ticketService.consumeTicketByQrToken(
+    qrToken: qrToken,
+    expectedTourId: expectedTourId,
+  );
+
+  /// QR token ile check-in yapar; detaylı sonuç döner.
+  Future<QrConsumeResult> consumeTicketByQrTokenDetailed({
+    required String qrToken,
+    required String expectedTourId,
+    String? expectedDate,
+  }) => _ticketService.consumeTicketByQrTokenDetailed(
+    qrToken: qrToken,
+    expectedTourId: expectedTourId,
+    expectedDate: expectedDate,
+  );
+
+  /// Bilet durumunu günceller.
+  Future<bool> updateTicketStatus(String ticketId, String newStatus) =>
+      _ticketService.updateTicketStatus(ticketId, newStatus);
+
+  //  ChatService delegates 
+
+  /// Sohbet mesajı gönderir.
+  Future<void> sendChatMessage(String tourId, ChatModel message) =>
+      _chatService.sendChatMessage(tourId, message);
+
+  /// Sohbet mesajlarını anlık dinler.
+  Stream<List<ChatModel>> getChatMessages(String tourId) =>
+      _chatService.getChatMessages(tourId);
+
+  /// Tüm mesajları tek seferlik getirir.
+  Future<List<ChatModel>> getAllChatMessages(String tourId) =>
+      _chatService.getAllChatMessages(tourId);
+
+  /// Sohbet mesajını siler.
+  Future<void> deleteChatMessage(String tourId, String messageId) =>
+      _chatService.deleteChatMessage(tourId, messageId);
+
+  /// Duyuru oluşturur.
+  Future<void> createAnnouncement(
+    String tourId,
+    AnnouncementModel announcement,
+  ) => _chatService.createAnnouncement(tourId, announcement);
+
+  /// Duyuruları anlık dinler.
+  Stream<List<AnnouncementModel>> getAnnouncements(String tourId) =>
+      _chatService.getAnnouncements(tourId);
+
+  /// Kullanıcının bildirim koleksiyonundan tura ait bildirimleri dinler (fallback).
+  Stream<List<AnnouncementModel>> getUserTourNotifications(
+    String userId,
+    String tourId,
+  ) => _chatService.getUserTourNotifications(userId, tourId);
+
+  /// Tüm duyuruları tek seferlik getirir.
+  Future<List<AnnouncementModel>> getAllAnnouncements(String tourId) =>
+      _chatService.getAllAnnouncements(tourId);
+
+  /// Duyuruyu siler.
+  Future<void> deleteAnnouncement(
+    String tourId,
+    String announcementId,
+  ) => _chatService.deleteAnnouncement(tourId, announcementId);
+
+  /// QR okutan katılımcılara Firestore bildirimi gönderir.
+  Future<void> sendNotificationToTourParticipants(
+    String tourId,
+    String message,
+  ) => _chatService.sendNotificationToTourParticipants(tourId, message);
 }

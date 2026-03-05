@@ -1,20 +1,38 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Bir tur biletini temsil eder.
+///
+/// Kullanıcı tur reservasyonu yaptığında oluşturulur.
+/// QR doğrulama sürecinde [qrToken] ve [isScanned] alanları güncellenir.
 class TicketModel {
   final String id;
   final String tourId;
   final String userId;
   final String companyId;
-  final String slotId; // Çıkış tarihi formatı: yyyy-MM-dd
+
+  /// Çıkış tarihi slotu: `yyyy-MM-dd` formatında.
+  final String slotId;
+
   final String passengerName;
   final String tcNo;
   final double pricePaid;
-  final String status; // 'active', 'checked_in', 'completed', 'cancelled'
+
+  /// Bilet durumu: `active` | `checked_in` | `completed` | `cancelled`.
+  final String status;
+
+  /// Tek kullanımlık QR token; okutulduktan sonra null yapılır.
   final String? qrToken;
+
+  /// Rehber QR'u okuttuğunda true yapılır.
   final bool isScanned;
+
   final DateTime purchaseDate;
+
+  /// QR okutulduğunda sunucu tarafından kaydedilen zaman damıgası.
   final DateTime? scannedAt;
-  final DateTime? departureDate; // Seçilen çıkış tarihi
+
+  /// Kullanıcının seçtiği çıkış tarihi.
+  final DateTime? departureDate;
 
   TicketModel({
     required this.id,
@@ -33,6 +51,7 @@ class TicketModel {
     this.departureDate,
   });
 
+  /// Firestore belgesinden [TicketModel] oluşturur.
   factory TicketModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return TicketModel(
@@ -53,6 +72,7 @@ class TicketModel {
     );
   }
 
+  /// Firestore'a yazılmak üzere JSON haritasına dönüştürür.
   Map<String, dynamic> toJson() {
     return {
       'tourId': tourId,

@@ -67,7 +67,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
     _messageController.selection = TextSelection.fromPosition(
       TextPosition(offset: _messageController.text.length),
     );
-    setState(() {});
+    // setState gerekmez — ValueListenableBuilder ile yeniden çizilir
   }
 
   @override
@@ -163,119 +163,121 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
     );
   }
 
-  // ── Yeni Duyuru Bölümü ──
+  // ── Yeni Duyuru Bölümü —— ValueListenableBuilder ile TextField değişikliğini dinler ──
   Widget _buildNewAnnouncementSection() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.slate900.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.slate800),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'YENİ DUYURU',
-                  style: TextStyle(
-                    color: AppColors.slate300,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'CANLI YAYIN',
-                      style: TextStyle(
-                        color: AppColors.success,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Text input
-            Stack(
-              children: [
-                TextField(
-                  controller: _messageController,
-                  maxLines: 5,
-                  maxLength: _maxLength,
-                  onChanged: (_) => setState(() {}),
-                  style: const TextStyle(color: AppColors.white, fontSize: 16, height: 1.5),
-                  decoration: InputDecoration(
-                    hintText: 'Mesajınızı buraya yazın... (Örn: Otobüs 5 dakika içinde kalkıyor)',
-                    hintStyle: TextStyle(color: AppColors.slate500, fontSize: 15),
-                    filled: true,
-                    fillColor: AppColors.slate800.withOpacity(0.5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.all(16),
-                    counterText: '',
-                  ),
-                ),
-                // Karakter sayacı
-                Positioned(
-                  bottom: 8,
-                  right: 12,
-                  child: Text(
-                    '${_messageController.text.length} / $_maxLength',
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _messageController,
+      builder: (context, textValue, _) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.slate900.withOpacity(0.4),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.slate800),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'YENİ DUYURU',
                     style: TextStyle(
-                      color: AppColors.slate600,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
+                      color: AppColors.slate300,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Gönder butonu
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: _messageController.text.trim().isEmpty ? null : _sendAnnouncement,
-                icon: const Icon(Icons.send, size: 22),
-                label: const Text(
-                  'QR Okutan Katılımcılara Gönder',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  disabledBackgroundColor: AppColors.primary.withOpacity(0.4),
-                  foregroundColor: AppColors.white,
-                  disabledForegroundColor: AppColors.white.withOpacity(0.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 6,
-                  shadowColor: AppColors.primary.withOpacity(0.2),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.success,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'CANLI YAYIN',
+                        style: TextStyle(
+                          color: AppColors.success,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Text input
+              Stack(
+                children: [
+                  TextField(
+                    controller: _messageController,
+                    maxLines: 5,
+                    maxLength: _maxLength,
+                    style: const TextStyle(color: AppColors.white, fontSize: 16, height: 1.5),
+                    decoration: InputDecoration(
+                      hintText: 'Mesajınızı buraya yazın... (Örn: Otobüs 5 dakika içinde kalkıyor)',
+                      hintStyle: TextStyle(color: AppColors.slate500, fontSize: 15),
+                      filled: true,
+                      fillColor: AppColors.slate800.withOpacity(0.5),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.all(16),
+                      counterText: '',
+                    ),
+                  ),
+                  // Karakter sayacı
+                  Positioned(
+                    bottom: 8,
+                    right: 12,
+                    child: Text(
+                      '${_messageController.text.length} / $_maxLength',
+                      style: TextStyle(
+                        color: AppColors.slate600,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Gönder butonu
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: _messageController.text.trim().isEmpty ? null : _sendAnnouncement,
+                  icon: const Icon(Icons.send, size: 22),
+                  label: const Text(
+                    'QR Okutan Katılımcılara Gönder',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    disabledBackgroundColor: AppColors.primary.withOpacity(0.4),
+                    foregroundColor: AppColors.white,
+                    disabledForegroundColor: AppColors.white.withOpacity(0.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 6,
+                    shadowColor: AppColors.primary.withOpacity(0.2),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -467,9 +469,7 @@ class _TourManagerAnnouncementsScreenState extends State<TourManagerAnnouncement
 
     await _announcementController.postAnnouncementForCheckedInParticipants(_tourId, message);
     if (mounted) {
-      setState(() {
-        _messageController.clear();
-      });
+      _messageController.clear(); // ValueListenableBuilder otomatik yeniden çizer
     }
   }
 }

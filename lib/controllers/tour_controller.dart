@@ -4,11 +4,21 @@ import 'package:get/get.dart';
 import '../models/tour_model.dart';
 import '../services/firebase_service.dart';
 
+/// Tur listesi ve tur detaylarını yöneten controller.
+///
+/// Sorumlulukları:
+/// - Şehre göre tur listeleme ve filtreleme
+/// - Seri bazlı tur gruplama (aynı turun farklı tarihleri)
+/// - Bölge bazlı gruplama (UI sırasıyla)
+/// - Tur güncelleme ve bitirme
 class TourController extends GetxController {
   final FirebaseService _firebaseService = FirebaseService();
 
+  /// Tüm aktif turları tutan reaktif liste.
   var tours = <TourModel>[].obs;
   var isLoading = true.obs;
+
+  /// Seçili çıkış şehri.
   var selectedCity = ''.obs;
 
   // Bölge sıralaması (sabit)
@@ -24,10 +34,10 @@ class TourController extends GetxController {
     'Yurtdışı',
   ];
 
-  // İlk açılışta otomatik fetch yapmıyoruz,
-  // şehir seçildiğinde filterByCity çağrılacak.
+  // İlk açılışta otomatik fetch yapılmaz;
+  // şehir seçildiğinde [filterByCity] çağrılır.
 
-  // Tüm aktif turları getir (isDeleted: false olanlar)
+  /// Silinmemiş tüm aktif turları getirir.
   void fetchTours() async {
     try {
       isLoading.value = true;
@@ -38,7 +48,7 @@ class TourController extends GetxController {
     }
   }
 
-  // Şehre göre filtrele
+  /// Şehre göre turları Firestore'dan getirir ve [tours]'u günceller.
   void filterByCity(String city) async {
     try {
       isLoading.value = true;
@@ -74,15 +84,14 @@ class TourController extends GetxController {
   /// Verilen display tour'a ait serideki tüm turları döner.
   List<TourModel> getToursInSeries(TourModel displayTour) {
     if (displayTour.seriesId == null) return [displayTour];
-    return tours.where((t) => t.seriesId == displayTour.seriesId).toList()
-      ..sort((a, b) {
-        final ad = a.departureDate;
-        final bd = b.departureDate;
-        if (ad == null && bd == null) return 0;
-        if (ad == null) return 1;
-        if (bd == null) return -1;
-        return ad.compareTo(bd);
-      });
+    return tours.where((t) => t.seriesId == displayTour.seriesId).toList()..sort((a, b) {
+      final ad = a.departureDate;
+      final bd = b.departureDate;
+      if (ad == null && bd == null) return 0;
+      if (ad == null) return 1;
+      if (bd == null) return -1;
+      return ad.compareTo(bd);
+    });
   }
 
   // Turları region'a göre grupla (sıralı) - displayTours kullanır
@@ -101,7 +110,7 @@ class TourController extends GetxController {
     return sorted;
   }
 
-  // Tur detayını getir [cite: 13]
+  /// Tur detayını ID ile getirir.
   Future<TourModel?> getTourDetail(String tourId) async {
     try {
       isLoading.value = true;
@@ -112,7 +121,7 @@ class TourController extends GetxController {
     }
   }
 
-  // Tur katılımcılarını getir [cite: 32]
+  /// Tur katılımcılarını getirir.
   Future<List<dynamic>> getTourParticipants(String tourId) async {
     try {
       var result = await _firebaseService.getTourParticipants(tourId);
@@ -123,7 +132,7 @@ class TourController extends GetxController {
     }
   }
 
-  // Turu bitir [cite: 6, 32]
+  /// Turu bitirme talebi gönderir.
   Future<void> finishTour(String tourId, String guideId) async {
     try {
       isLoading.value = true;
@@ -135,7 +144,7 @@ class TourController extends GetxController {
     }
   }
 
-  // Turu güncelle [cite: 32]
+  /// Turu Firestore'da günceller ve lokal listeyi senkronize eder.
   Future<void> updateTour(String tourId, TourModel updatedTour) async {
     try {
       isLoading.value = true;

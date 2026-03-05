@@ -1,11 +1,10 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../config/app_routes.dart';
+import '../../config/app_strings.dart';
 import '../../config/colors.dart';
-import '../../services/firebase_service.dart';
+import '../../controllers/tour_manager_customers_controller.dart';
 
 class TourManagerCustomersScreen extends StatefulWidget {
   const TourManagerCustomersScreen({super.key});
@@ -15,106 +14,29 @@ class TourManagerCustomersScreen extends StatefulWidget {
 }
 
 class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen> {
-  final FirebaseService _firebaseService = FirebaseService();
+  late final TourManagerCustomersController _ctrl;
   final TextEditingController _searchController = TextEditingController();
-  int _selectedTab = 0; // 0: Tümü, 1: Gelenler, 2: Gelmeyenler
-  String _tourId = '';
-  String _tourTitle = '';
-  bool _isLoading = true;
-
-  final List<_Participant> _allParticipants = [];
-
-  List<_Participant> get _filteredParticipants {
-    var list = _allParticipants;
-    // Tab filtresi
-    if (_selectedTab == 1) {
-      list = list.where((p) => p.arrived).toList();
-    } else if (_selectedTab == 2) {
-      list = list.where((p) => !p.arrived).toList();
-    }
-    // Arama filtresi
-    final query = _searchController.text.toLowerCase();
-    if (query.isNotEmpty) {
-      list = list
-          .where(
-            (p) => p.name.toLowerCase().contains(query) || p.subtitle.toLowerCase().contains(query),
-          )
-          .toList();
-    }
-    return list;
-  }
-
-  int get _arrivedCount => _allParticipants.where((p) => p.arrived).length;
-  int get _pendingCount => _allParticipants.where((p) => !p.arrived).length;
 
   @override
   void initState() {
     super.initState();
     final args = Get.arguments as Map<String, dynamic>? ?? {};
-    _tourId = args['tourId']?.toString().trim() ?? '';
-    _tourTitle = args['tourTitle']?.toString().trim() ?? '';
-    _loadParticipants();
-  }
+    final tourId = args['tourId']?.toString().trim() ?? '';
+    final tourTitle = args['tourTitle']?.toString().trim() ?? '';
 
-  Future<void> _loadParticipants() async {
-    setState(() => _isLoading = true);
+    _ctrl = Get.put(TourManagerCustomersController());
+    _ctrl.init(tourId: tourId, tourTitle: tourTitle);
 
-    if (_tourId.isEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      final isGuideSession = prefs.getBool('is_guide_session') ?? false;
-      var guideId = (prefs.getString('guide_id') ?? '').trim();
-
-      if (!isGuideSession || guideId.isEmpty) {
-        guideId = FirebaseAuth.instance.currentUser?.uid ?? '';
-      }
-
-      if (guideId.isNotEmpty) {
-        final assignedTour = await _firebaseService.getAssignedTourForGuide(guideId);
-        if (assignedTour != null) {
-          _tourId = assignedTour.id;
-          if (_tourTitle.isEmpty) {
-            _tourTitle = assignedTour.title;
-          }
-        }
-      }
-    }
-
-    if (_tourId.isEmpty) {
-      setState(() {
-        _allParticipants.clear();
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final result = await _firebaseService.getTourParticipants(_tourId);
-    final parsed = result.map((item) {
-      final status = item['status']?.toString().toLowerCase() ?? '';
-      final scanned = item['isScanned'] == true;
-      final arrived = scanned || status == 'checked_in';
-
-      return _Participant(
-        name: item['passengerName']?.toString().trim().isNotEmpty == true
-            ? item['passengerName'].toString()
-            : 'İsimsiz Katılımcı',
-        subtitle: item['tcNo']?.toString().trim().isNotEmpty == true
-            ? 'TC: ${item['tcNo']}'
-            : 'Kimlik bilgisi yok',
-        arrived: arrived,
-      );
-    }).toList();
-
-    setState(() {
-      _allParticipants
-        ..clear()
-        ..addAll(parsed);
-      _isLoading = false;
+    // Arama kutusundaki değişikliği controller'a aktar
+    _searchController.addListener(() {
+      _ctrl.searchQuery.value = _searchController.text;
     });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    Get.delete<TourManagerCustomersController>();
     super.dispose();
   }
 
@@ -129,9 +51,11 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
             _buildStatsBar(),
             _buildSearchAndTabs(),
             Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                  : _buildParticipantList(),
+              child: Obx(
+                () => _ctrl.isLoading.value
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                    : _buildParticipantList(),
+              ),
             ),
           ],
         ),
@@ -169,7 +93,7 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
             child: Column(
               children: [
                 const Text(
-                  'Katılımcı Listesi',
+                  AppStrings.participantList,
                   style: TextStyle(
                     color: AppColors.white,
                     fontSize: 18,
@@ -178,9 +102,11 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  _tourTitle.isEmpty ? 'Atanmış tur yok' : _tourTitle,
-                  style: const TextStyle(color: AppColors.slate400, fontSize: 12),
+                Obx(
+                  () => Text(
+                    _ctrl.tourTitle.isEmpty ? 'Atanmış tur yok' : _ctrl.tourTitle,
+                    style: const TextStyle(color: AppColors.slate400, fontSize: 12),
+                  ),
                 ),
               ],
             ),
@@ -201,23 +127,25 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
 
   // ── Stats Bar ──
   Widget _buildStatsBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: AppColors.cardDark,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.slate700),
-        ),
-        child: Row(
-          children: [
-            _statItem('TOPLAM', '${_allParticipants.length}', AppColors.white),
-            _divider(),
-            _statItem('GELEN', '$_arrivedCount', AppColors.success),
-            _divider(),
-            _statItem('BEKLENEN', '$_pendingCount', AppColors.error),
-          ],
+    return Obx(
+      () => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          decoration: BoxDecoration(
+            color: AppColors.cardDark,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.slate700),
+          ),
+          child: Row(
+            children: [
+              _statItem(AppStrings.statTotal, '${_ctrl.allParticipants.length}', AppColors.white),
+              _divider(),
+              _statItem(AppStrings.statArrived, '${_ctrl.arrivedCount}', AppColors.success),
+              _divider(),
+              _statItem(AppStrings.statPending, '${_ctrl.pendingCount}', AppColors.error),
+            ],
+          ),
         ),
       ),
     );
@@ -271,10 +199,10 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    onChanged: (_) => setState(() {}),
+                    // Arama listener initState’te eklendi — burada setState yok
                     style: const TextStyle(color: AppColors.white, fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: 'Katılımcı ara...',
+                      hintText: AppStrings.searchParticipant,
                       hintStyle: TextStyle(color: AppColors.slate400, fontSize: 14),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -286,18 +214,20 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
           ),
           const SizedBox(height: 12),
           // Tabs
-          Container(
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.slate700, width: 1)),
-            ),
-            child: Row(
-              children: [
-                _tabItem('Tümü (${_allParticipants.length})', 0),
-                const SizedBox(width: 24),
-                _tabItem('Gelenler ($_arrivedCount)', 1),
-                const SizedBox(width: 24),
-                _tabItem('Gelmeyenler ($_pendingCount)', 2),
-              ],
+          Obx(
+            () => Container(
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppColors.slate700, width: 1)),
+              ),
+              child: Row(
+                children: [
+                  _tabItem('${AppStrings.tabAll} (${_ctrl.allParticipants.length})', 0),
+                  const SizedBox(width: 24),
+                  _tabItem('${AppStrings.tabArrived} (${_ctrl.arrivedCount})', 1),
+                  const SizedBox(width: 24),
+                  _tabItem('${AppStrings.tabNotArrived} (${_ctrl.pendingCount})', 2),
+                ],
+              ),
             ),
           ),
         ],
@@ -306,31 +236,36 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
   }
 
   Widget _tabItem(String label, int index) {
-    final isActive = _selectedTab == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTab = index),
-      child: Container(
-        padding: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: isActive ? AppColors.primary : Colors.transparent, width: 2),
+    return Obx(() {
+      final isActive = _ctrl.selectedTab.value == index;
+      return GestureDetector(
+        onTap: () => _ctrl.selectedTab.value = index,
+        child: Container(
+          padding: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isActive ? AppColors.primary : Colors.transparent,
+                width: 2,
+              ),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isActive ? AppColors.white : AppColors.slate400,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? AppColors.white : AppColors.slate400,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
+      );
+    });
   }
 
   // ── Participant List ──
   Widget _buildParticipantList() {
-    final participants = _filteredParticipants;
+    final participants = _ctrl.filteredParticipants;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Container(
@@ -340,20 +275,39 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: ListView.separated(
-            padding: EdgeInsets.zero,
-            itemCount: participants.length,
-            separatorBuilder: (_, _) => Container(height: 1, color: AppColors.slate800),
-            itemBuilder: (context, index) {
-              return _buildParticipantTile(participants[index]);
-            },
-          ),
+          child: participants.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: Text(
+                      'Katılımcı bulunamadı.',
+                      style: TextStyle(color: AppColors.slate400),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: EdgeInsets.zero,
+                  itemCount: participants.length,
+                  separatorBuilder: (_, _) => Container(height: 1, color: AppColors.slate800),
+                  itemBuilder: (context, index) {
+                    return _ParticipantTile(participant: participants[index]);
+                  },
+                ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildParticipantTile(_Participant participant) {
+// ══════════════════════════════════════════════════════════════
+// Katılımcı satır kartı — StatelessWidget olarak extract edildi
+// ══════════════════════════════════════════════════════════════
+class _ParticipantTile extends StatelessWidget {
+  final ParticipantItem participant;
+  const _ParticipantTile({required this.participant});
+
+  @override
+  Widget build(BuildContext context) {
     final initials = participant.name
         .split(' ')
         .map((w) => w.isNotEmpty ? w[0] : '')
@@ -391,47 +345,44 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
             ),
           ),
           const SizedBox(width: 12),
-          // Name & phone
+          // İsim & TC
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        participant.name,
-                        style: const TextStyle(
-                          color: AppColors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                Text(
+                  participant.name,
+                  style: const TextStyle(
+                    color: AppColors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Text(
-                      participant.subtitle,
-                      style: const TextStyle(color: AppColors.slate400, fontSize: 12),
-                    ),
-                  ],
+                Text(
+                  participant.subtitle,
+                  style: const TextStyle(color: AppColors.slate400, fontSize: 12),
                 ),
               ],
             ),
           ),
-          // Status badge
-          _statusBadge(participant.arrived),
+          // Durum rozeti
+          _StatusBadge(arrived: participant.arrived),
         ],
       ),
     );
   }
+}
 
-  Widget _statusBadge(bool arrived) {
+// Küçük durum rozeti — 2 satırlık yardımcı widget
+class _StatusBadge extends StatelessWidget {
+  final bool arrived;
+  const _StatusBadge({required this.arrived});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -451,7 +402,7 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
           ),
           const SizedBox(width: 6),
           Text(
-            arrived ? 'Geldi' : 'Gelmedi',
+            arrived ? AppStrings.arrivedLabel : AppStrings.notArrivedLabel,
             style: TextStyle(
               color: arrived ? AppColors.successLight : AppColors.errorLight,
               fontSize: 12,
@@ -462,12 +413,4 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
       ),
     );
   }
-}
-
-class _Participant {
-  final String name;
-  final String subtitle;
-  final bool arrived;
-
-  const _Participant({required this.name, required this.subtitle, required this.arrived});
 }

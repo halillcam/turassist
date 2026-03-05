@@ -1,17 +1,42 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Uygulamadaki her kullanıcıyı temsil eder.
+///
+/// Kabul edilen roller:
+/// - `customer`    → Tur satın alan normal kullanıcı
+/// - `guide`       → Tur sorumlusu (Firebase Auth kullanmaz, guides koleksiyonu)
+/// - `admin`       → Şirket yöneticisi (yalnızca web panelinde)
+/// - `super_admin` → Platform yöneticisi (yalnızca web panelinde)
 class UserModel {
+  /// Firebase Auth veya guides koleksiyonundaki belge ID'si.
   final String uid;
+
+  /// Ad + soyad.
   final String fullName;
+
   final String email;
   final String phone;
-  final String role; // 'customer', 'guide', 'admin', 'super_admin'
+
+  /// Kullanıcı rolü: 'customer' | 'guide' | 'admin' | 'super_admin'.
+  final String role;
+
+  /// Kullanıcının bağlı olduğu şirketin ID'si (guide ve admin için).
   final String companyId;
-  final List<String> registeredCompanies; //
+
+  /// Kullanıcının erişim yetkisi olan şirket ID listesi.
+  final List<String> registeredCompanies;
+
   final String tcNo;
+
+  /// Profil fotoğrafı URL'si (opsiyonel).
   final String? profileImage;
+
+  /// Kullanıcının son seçtiği çıkış şehri.
   final String selectedCity;
+
+  /// Soft-delete bayrağı; true ise kullanıcı silinmiş kabul edilir.
   final bool isDeleted;
+
   final DateTime createdAt;
 
   UserModel({
@@ -29,6 +54,7 @@ class UserModel {
     required this.createdAt,
   });
 
+  /// Firestore belgesinden [UserModel] oluşturur.
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return UserModel(
@@ -47,6 +73,7 @@ class UserModel {
     );
   }
 
+  /// Firestore'a yazılmak üzere JSON haritasına dönüştürür.
   Map<String, dynamic> toJson() {
     return {
       'fullName': fullName,

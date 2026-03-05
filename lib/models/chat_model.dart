@@ -1,12 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Tur sohbetindeki tek bir mesajı temsil eder.
+///
+/// `tours/{tourId}/messages` koleksiyonunda saklanır.
+/// Gönderen rolü (`senderRole`) mesajın UI'da farklı gösterilmesini sağlar.
 class ChatModel {
   final String id;
-  final String senderId; //
-  final String senderName; //
+  final String senderId;
+  final String senderName;
+
+  /// Gönderenin rolü: `customer` | `guide` | `admin`.
   final String senderRole;
-  final String text; //
-  final DateTime createdAt; //
+
+  final String text;
+  final DateTime createdAt;
 
   ChatModel({
     required this.id,
@@ -17,6 +24,8 @@ class ChatModel {
     required this.createdAt,
   });
 
+  /// Firestore belgesinden [ChatModel] oluşturur.
+  /// `createdAt` yoksa eski `timestamp` alanına, o da yoksa anına döner.
   factory ChatModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return ChatModel(
@@ -32,6 +41,7 @@ class ChatModel {
     );
   }
 
+  /// Firestore'a yazılmak üzere JSON haritasına dönüştürür.
   Map<String, dynamic> toJson() {
     return {
       'senderId': senderId,

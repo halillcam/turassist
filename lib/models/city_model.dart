@@ -1,5 +1,6 @@
 import '../config/city_image_urls.dart';
 
+/// Türkiye'nin 7 coğrafi bölgesini tanımlar.
 enum CityRegion { marmara, karadeniz, ege, icAnadolu, akdeniz, doguAnadolu, guneydoguAnadolu }
 
 extension CityRegionName on CityRegion {
@@ -42,6 +43,9 @@ extension CityRegionName on CityRegion {
   }
 }
 
+/// Şehri ve bölgesiyle birlikte temsil eder.
+///
+/// [isAvailable] false ise kullanıcı bu şehri UI'da seçemez.
 class City {
   final String name;
   final String? imageAsset;

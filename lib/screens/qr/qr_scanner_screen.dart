@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../config/colors.dart';
-import '../../services/firebase_service.dart';
+import '../../services/ticket_service.dart';
 
 class QrScannerScreen extends StatefulWidget {
   const QrScannerScreen({super.key});
@@ -13,7 +13,8 @@ class QrScannerScreen extends StatefulWidget {
 }
 
 class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProviderStateMixin {
-  final FirebaseService _firebaseService = FirebaseService();
+  /// Bilet doğrulama işlemleri için servis.
+  final TicketService _ticketService = TicketService();
   final MobileScannerController _scannerController = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     formats: [BarcodeFormat.qrCode],
@@ -23,7 +24,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
   bool _isProcessing = false;
-  bool _isFlashOn = false;
+
+  /// Fener (flash) açık mı? — setState yerine Rx, sadece ilgili widget Obx ile sarılır.
+  final RxBool _isFlashOn = false.obs;
   String _tourId = '';
 
   @override
@@ -81,7 +84,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
     }
     debugPrint('QR_SCANNER: expectedDate → "$expectedDate"');
 
-    final result = await _firebaseService.consumeTicketByQrTokenDetailed(
+    final result = await _ticketService.consumeTicketByQrTokenDetailed(
       qrToken: raw,
       expectedTourId: _tourId,
       expectedDate: expectedDate,
@@ -209,26 +212,28 @@ class _QrScannerScreenState extends State<QrScannerScreen> with SingleTickerProv
           GestureDetector(
             onTap: () async {
               await _scannerController.toggleTorch();
-              setState(() => _isFlashOn = !_isFlashOn);
+              _isFlashOn.value = !_isFlashOn.value;
             },
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: _isFlashOn
-                    ? AppColors.primary.withOpacity(0.2)
-                    : Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: _isFlashOn
-                      ? AppColors.primary.withOpacity(0.4)
-                      : Colors.white.withOpacity(0.1),
+            child: Obx(
+              () => Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: _isFlashOn.value
+                      ? AppColors.primary.withOpacity(0.2)
+                      : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _isFlashOn.value
+                        ? AppColors.primary.withOpacity(0.4)
+                        : Colors.white.withOpacity(0.1),
+                  ),
                 ),
-              ),
-              child: Icon(
-                _isFlashOn ? Icons.flashlight_on : Icons.flashlight_off,
-                color: _isFlashOn ? AppColors.primary : AppColors.white,
-                size: 22,
+                child: Icon(
+                  _isFlashOn.value ? Icons.flashlight_on : Icons.flashlight_off,
+                  color: _isFlashOn.value ? AppColors.primary : AppColors.white,
+                  size: 22,
+                ),
               ),
             ),
           ),

@@ -7,9 +7,11 @@ import '../../config/app_routes.dart';
 import '../../config/colors.dart';
 import '../../controllers/booking_controller.dart';
 import '../../controllers/my_tours_controller.dart';
+import '../../controllers/tour_detail_controller.dart';
 import '../../models/tour_model.dart';
 import '../../models/tour_program_model.dart';
-import '../../services/firebase_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/ticket_service.dart';
 
 class TourDetailScreen extends StatefulWidget {
   /// Serideki tüm turlar (aynı turun farklı tarihleri). İlk eleman display için kullanılır.
@@ -24,24 +26,23 @@ class TourDetailScreen extends StatefulWidget {
 }
 
 class _TourDetailScreenState extends State<TourDetailScreen> {
-  bool _isDescriptionExpanded = false;
-  List<TourProgramDay> _programDays = [];
-  bool _isProgramLoading = true;
+  // Servis katmanlı state artık controller'da yaşıyor — setState gerekmez.
+  late final TourDetailController _ctrl;
+  final TicketService _ticketService = TicketService();
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
     super.initState();
-    _loadTourProgram();
+    // Her TourDetailScreen örneği kendi tag'lı controller'ını kullanır.
+    _ctrl = Get.put(TourDetailController(), tag: widget._displayTour.id);
+    _ctrl.loadTourProgram(widget._displayTour.id);
   }
 
-  Future<void> _loadTourProgram() async {
-    final days = await FirebaseService().getTourProgram(widget._displayTour.id);
-    if (mounted) {
-      setState(() {
-        _programDays = days;
-        _isProgramLoading = false;
-      });
-    }
+  @override
+  void dispose() {
+    Get.delete<TourDetailController>(tag: widget._displayTour.id);
+    super.dispose();
   }
 
   @override
@@ -59,10 +60,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Hero image
-                _buildHeroImage(tour),
+                _TourHeroImage(tour: tour),
 
                 // Info card (overlapping image)
-                _buildInfoCard(tour),
+                _TourInfoCard(tour: tour, toursInSeries: widget.toursInSeries),
 
                 // Tur Hakkında
                 _buildAboutSection(tour),
@@ -105,7 +106,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     final selected = await _showDepartureDatePicker(widget.toursInSeries);
     if (selected == null) return;
 
-    final profile = await FirebaseService().getUserProfile();
+    final profile = await _authService.getUserProfile();
     final profileName = profile?.fullName.trim() ?? '';
     final displayName = user.displayName?.trim() ?? '';
     final emailFallback = (user.email ?? '').split('@').first.trim();
@@ -165,7 +166,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     final slotIds = options.map((o) => DateFormat('yyyy-MM-dd').format(o.date)).toList();
     final counts = <String, int>{};
     for (var i = 0; i < options.length; i++) {
-      final c = await FirebaseService().getSlotTicketCounts(options[i].tour.id, [slotIds[i]]);
+      final c = await _ticketService.getSlotTicketCounts(options[i].tour.id, [slotIds[i]]);
       counts[slotIds[i]] = c[slotIds[i]] ?? 0;
     }
 
@@ -312,206 +313,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     return '${days[date.weekday - 1]}, ${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
-  Widget _buildHeroImage(TourModel tour) {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.45,
-      width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Image
-          tour.imageUrl.isNotEmpty
-              ? Image.network(
-                  tour.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: AppColors.slate800,
-                    child: const Center(
-                      child: Icon(
-                        Icons.image_not_supported_outlined,
-                        color: AppColors.slate500,
-                        size: 48,
-                      ),
-                    ),
-                  ),
-                )
-              : Container(
-                  color: AppColors.slate800,
-                  child: const Center(
-                    child: Icon(
-                      Icons.image_not_supported_outlined,
-                      color: AppColors.slate500,
-                      size: 48,
-                    ),
-                  ),
-                ),
-
-          // Gradient overlay
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, AppColors.backgroundDark.withOpacity(0.8)],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(TourModel tour) {
-    return Transform.translate(
-      offset: const Offset(0, -40),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AppColors.cardDark,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.slate800),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              // Tour title
-              Text(
-                tour.title,
-                style: const TextStyle(
-                  color: AppColors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  height: 1.3,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-
-              // Divider
-              Container(height: 1, color: AppColors.slate800),
-              const SizedBox(height: 20),
-
-              // Capacity & Company info
-              Row(
-                children: [
-                  // Kapasite
-                  Expanded(
-                    child: Column(
-                      children: [
-                        const Icon(Icons.group, color: AppColors.primary, size: 24),
-                        const SizedBox(height: 6),
-                        Text(
-                          'KAPASİTE',
-                          style: TextStyle(
-                            color: AppColors.slate500,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${tour.capacity} Kişi',
-                          style: const TextStyle(
-                            color: AppColors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Ayırıcı
-                  Container(width: 1, height: 60, color: AppColors.slate800),
-                  // Tur Firması
-                  Expanded(
-                    child: Column(
-                      children: [
-                        const Icon(Icons.business, color: AppColors.primary, size: 24),
-                        const SizedBox(height: 6),
-                        Text(
-                          'TUR FİRMASI',
-                          style: TextStyle(
-                            color: AppColors.slate500,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          tour.companyId,
-                          style: const TextStyle(
-                            color: AppColors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              // Çıkış günleri / tarihler bilgisi
-              if (tour.departureDays.isNotEmpty ||
-                  (tour.departureDates != null && tour.departureDates!.isNotEmpty) ||
-                  widget.toursInSeries.any((t) => t.departureDate != null)) ...[
-                const SizedBox(height: 20),
-                Container(height: 1, color: AppColors.slate800),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_month, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        tour.departureDays.isNotEmpty
-                            ? 'Çıkış günleri: ${tour.departureDaysText}'
-                            : tour.departureDates != null && tour.departureDates!.isNotEmpty
-                            ? 'Özel tarihler: ${tour.departureDates!.length} tarih'
-                            : '${widget.toursInSeries.where((t) => t.departureDate != null).length} farklı tarihte çıkış',
-                        style: const TextStyle(
-                          color: AppColors.slate300,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    if (tour.departureTime.isNotEmpty) ...[
-                      Icon(Icons.access_time, color: AppColors.primary, size: 18),
-                      const SizedBox(width: 4),
-                      Text(
-                        tour.departureTime,
-                        style: const TextStyle(
-                          color: AppColors.slate300,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildAboutSection(TourModel tour) {
     return Transform.translate(
       offset: const Offset(0, -16),
@@ -525,41 +326,41 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               style: TextStyle(color: AppColors.white, fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 12),
-            Text(
-              tour.description,
-              style: const TextStyle(color: AppColors.slate400, fontSize: 14, height: 1.6),
-              maxLines: _isDescriptionExpanded ? null : 5,
-              overflow: _isDescriptionExpanded ? null : TextOverflow.ellipsis,
+            Obx(
+              () => Text(
+                tour.description,
+                style: const TextStyle(color: AppColors.slate400, fontSize: 14, height: 1.6),
+                maxLines: _ctrl.isDescriptionExpanded.value ? null : 5,
+                overflow: _ctrl.isDescriptionExpanded.value ? null : TextOverflow.ellipsis,
+              ),
             ),
             if (tour.description.length > 150)
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _isDescriptionExpanded = !_isDescriptionExpanded;
-                  });
-                },
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _isDescriptionExpanded ? 'Daha az göster' : 'Daha fazla oku',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
+              Obx(
+                () => GestureDetector(
+                  onTap: _ctrl.toggleDescription,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _ctrl.isDescriptionExpanded.value ? 'Daha az göster' : 'Daha fazla oku',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        _isDescriptionExpanded
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        color: AppColors.primary,
-                        size: 18,
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Icon(
+                          _ctrl.isDescriptionExpanded.value
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                          color: AppColors.primary,
+                          size: 18,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -667,119 +468,38 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               style: TextStyle(color: AppColors.white, fontSize: 18, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
-            if (_isProgramLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+            Obx(() {
+              if (_ctrl.isProgramLoading.value) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    ),
                   ),
-                ),
-              )
-            else if (_programDays.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  'Henüz program eklenmemiş.',
-                  style: TextStyle(color: AppColors.slate500, fontSize: 14),
-                ),
-              )
-            else
-              ..._programDays.map(_buildDayItem),
+                );
+              }
+              if (_ctrl.programDays.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'Henüz program eklenmemiş.',
+                    style: TextStyle(color: AppColors.slate500, fontSize: 14),
+                  ),
+                );
+              }
+              return Column(
+                children: _ctrl.programDays
+                    .map(
+                      (day) => _ProgramDayItem(day: day, isLastDay: day == _ctrl.programDays.last),
+                    )
+                    .toList(),
+              );
+            }),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDayItem(TourProgramDay day) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Timeline column
-          Column(
-            children: [
-              // Day dot
-              Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.4),
-                      blurRadius: 6,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-              ),
-              // Line
-              if (day != _programDays.last)
-                Container(
-                  width: 2,
-                  height: day.activities.length * 32.0 + 16,
-                  color: AppColors.slate800,
-                ),
-            ],
-          ),
-          const SizedBox(width: 14),
-          // Day content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Day title
-                Transform.translate(
-                  offset: const Offset(0, -3),
-                  child: Text(
-                    day.title.isNotEmpty ? '${day.day}. Gün' : '${day.day}. Gün',
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Activities
-                ...day.activities.map(
-                  (activity) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.slate500,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            activity.trim(),
-                            style: const TextStyle(
-                              color: AppColors.slate300,
-                              fontSize: 14,
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -882,6 +602,300 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TourHeroImage extends StatelessWidget {
+  final TourModel tour;
+
+  const _TourHeroImage({required this.tour});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.45,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          tour.imageUrl.isNotEmpty
+              ? Image.network(
+                  tour.imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: AppColors.slate800,
+                    child: const Center(
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        color: AppColors.slate500,
+                        size: 48,
+                      ),
+                    ),
+                  ),
+                )
+              : Container(
+                  color: AppColors.slate800,
+                  child: const Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      color: AppColors.slate500,
+                      size: 48,
+                    ),
+                  ),
+                ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, AppColors.backgroundDark.withOpacity(0.8)],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TourInfoCard extends StatelessWidget {
+  final TourModel tour;
+  final List<TourModel> toursInSeries;
+
+  const _TourInfoCard({required this.tour, required this.toursInSeries});
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: const Offset(0, -40),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.cardDark,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.slate800),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Text(
+                tour.title,
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  height: 1.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Container(height: 1, color: AppColors.slate800),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Icon(Icons.group, color: AppColors.primary, size: 24),
+                        const SizedBox(height: 6),
+                        Text(
+                          'KAPASİTE',
+                          style: TextStyle(
+                            color: AppColors.slate500,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${tour.capacity} Kişi',
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(width: 1, height: 60, color: AppColors.slate800),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Icon(Icons.business, color: AppColors.primary, size: 24),
+                        const SizedBox(height: 6),
+                        Text(
+                          'TUR FİRMASI',
+                          style: TextStyle(
+                            color: AppColors.slate500,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          tour.companyId,
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (tour.departureDays.isNotEmpty ||
+                  (tour.departureDates != null && tour.departureDates!.isNotEmpty) ||
+                  toursInSeries.any((t) => t.departureDate != null)) ...[
+                const SizedBox(height: 20),
+                Container(height: 1, color: AppColors.slate800),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_month, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        tour.departureDays.isNotEmpty
+                            ? 'Çıkış günleri: ${tour.departureDaysText}'
+                            : tour.departureDates != null && tour.departureDates!.isNotEmpty
+                            ? 'Özel tarihler: ${tour.departureDates!.length} tarih'
+                            : '${toursInSeries.where((t) => t.departureDate != null).length} farklı tarihte çıkış',
+                        style: const TextStyle(
+                          color: AppColors.slate300,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (tour.departureTime.isNotEmpty) ...[
+                      Icon(Icons.access_time, color: AppColors.primary, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        tour.departureTime,
+                        style: const TextStyle(
+                          color: AppColors.slate300,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgramDayItem extends StatelessWidget {
+  final TourProgramDay day;
+  final bool isLastDay;
+
+  const _ProgramDayItem({required this.day, required this.isLastDay});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.4),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+              if (!isLastDay)
+                Container(
+                  width: 2,
+                  height: day.activities.length * 32.0 + 16,
+                  color: AppColors.slate800,
+                ),
+            ],
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Transform.translate(
+                  offset: const Offset(0, -3),
+                  child: Text(
+                    '${day.day}. Gün',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...day.activities.map(
+                  (activity) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: AppColors.slate500,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            activity.trim(),
+                            style: const TextStyle(
+                              color: AppColors.slate300,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

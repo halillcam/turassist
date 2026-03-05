@@ -63,6 +63,10 @@ class _TourListScreenState extends State<TourListScreen> {
     _searchQuery.value = _searchController.text.toLowerCase();
   }
 
+  /// Turları bölge başlığına göre gruplar (controller'daki sıralamaya uyar).
+  ///
+  /// [TourController.toursByRegion]'dan farklı olarak herhangi bir
+  /// tur listesi alabilir — arama filtresiyle çalışmak için gereklidir.
   Map<String, List<TourModel>> _groupToursByRegion(List<TourModel> tours) {
     final grouped = <String, List<TourModel>>{};
     for (var tour in tours) {
@@ -77,6 +81,8 @@ class _TourListScreenState extends State<TourListScreen> {
     return sorted;
   }
 
+  /// Başlık, şehir veya açıklama içinde arama yapar.
+  /// Sorgu boşsa tüm turları döndürür.
   List<TourModel> _filterTours(List<TourModel> tours) {
     if (_searchQuery.value.isEmpty) {
       return tours;
@@ -165,7 +171,9 @@ class _TourListScreenState extends State<TourListScreen> {
                               },
                               childCount: _tourController.tours.isEmpty
                                   ? 0
-                                  : _groupToursByRegion(_filterTours(_tourController.displayTours)).length,
+                                  : _groupToursByRegion(
+                                      _filterTours(_tourController.displayTours),
+                                    ).length,
                             ),
                           ),
                       ],

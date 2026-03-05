@@ -5,11 +5,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/city_model.dart';
 import 'tour_controller.dart';
 
+/// Şehir seçimi ve kalıcı şehir tercihi yönetimi için controller.
+///
+/// Sorumlulukları:
+/// - SharedPreferences'ta kaydedilen şehri yükleyip geri yazma
+/// - Şehir değiştirildiğinde [TourController]'a bildirme
+/// - Şehir listesini yerel [cityList]'ten doldurma
 class CityController extends GetxController {
   var selectedCity = "".obs;
   var cities = <String>[].obs;
   var isLoading = false.obs;
 
+  /// SharedPreferences'ta kullanılan anahtar.
   static const String _cityKey = 'selected_city';
 
   @override
@@ -36,13 +43,13 @@ class CityController extends GetxController {
     }
   }
 
-  // Kayıtlı şehri döner (async - TourListScreen initState için)
+  /// Kaydedilmiş şehri asenkron olarak döndürür (TourListScreen initState için).
   Future<String?> getSavedCity() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_cityKey);
   }
 
-  // Tüm şehirleri getir [cite: 12]
+  /// Şehir listesini yerel kaynaktan (cityList) günceller.
   Future<void> getCities() async {
     try {
       isLoading.value = true;
@@ -54,7 +61,8 @@ class CityController extends GetxController {
     }
   }
 
-  // Şehir seçildiğinde locale kaydet ve turları filtrelet [cite: 12, 13]
+  /// Yeni şehri hem reaktif state'e hem SharedPreferences'a kaydeder
+  /// ve [TourController]'a filtreleme komutu gönderir.
   Future<void> updateCity(String city) async {
     selectedCity.value = city;
     // SharedPreferences'a kaydet
@@ -66,6 +74,6 @@ class CityController extends GetxController {
     }
   }
 
-  // Şehir seçilmiş mi kontrol et
+  /// Kullanıcının bir şehir seçip seçmediğini kontrol eder.
   bool get hasCitySelected => selectedCity.value.isNotEmpty;
 }

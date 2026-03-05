@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../config/app_strings.dart';
 import '../../config/colors.dart';
+import '../../services/auth_service.dart';
 import '../../services/firebase_service.dart';
 
 class TourManagerHomeScreen extends StatefulWidget {
@@ -47,22 +48,22 @@ class _GuideDashboardData {
 
 class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  Future<_GuideDashboardData> _dashboardFuture = Future.value(
-    const _GuideDashboardData(guideName: 'Tur Sorumlusu'),
-  );
+  final AuthService _authService = AuthService();
+
+  /// Dashboard future — setState yerine Rx ile tetiklenir,
+  /// sadece FutureBuilder’ı saran Obx yeniden çizer.
+  late final Rx<Future<_GuideDashboardData>> _dashboardFuture;
 
   @override
   void initState() {
     super.initState();
-    _dashboardFuture = _loadDashboardData();
+    _dashboardFuture = Rx<Future<_GuideDashboardData>>(_loadDashboardData());
   }
 
   /// Dashboard verilerini yeniden yükler (pull-to-refresh & QR sonrası).
   Future<void> _refreshDashboard() async {
     final fresh = _loadDashboardData();
-    setState(() {
-      _dashboardFuture = fresh;
-    });
+    _dashboardFuture.value = fresh; // Obx’i tetikler, setState gerekmez
     await fresh;
   }
 
@@ -141,93 +142,84 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
     );
   }
 
+  /// Rehberin tam adını çözümler.
+  ///
+  /// Önce [AuthService.getGuideFullName] ile Firestore'dan arar;
+  /// bulunamazsa SharedPreferences'taki önbellek adına döner.
   Future<String> _getGuideFullName() async {
     final uid = await _resolveGuideId();
-    if (uid.isEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedName = (prefs.getString('guide_name') ?? '').trim();
-      return cachedName.isEmpty ? 'Tur Sorumlusu' : cachedName;
-    }
-
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    if (userDoc.exists) {
-      final data = userDoc.data();
-      final fullName = data?['fullName']?.toString().trim() ?? '';
-      if (fullName.isNotEmpty) return fullName;
-    }
-
-    final guideDoc = await FirebaseFirestore.instance.collection('guides').doc(uid).get();
-    if (guideDoc.exists) {
-      final data = guideDoc.data();
-      final fullName = data?['fullName']?.toString().trim() ?? '';
-      if (fullName.isNotEmpty) return fullName;
-    }
-
     final prefs = await SharedPreferences.getInstance();
     final cachedName = (prefs.getString('guide_name') ?? '').trim();
-    return cachedName.isEmpty ? 'Tur Sorumlusu' : cachedName;
+    final fallback = cachedName.isEmpty ? 'Tur Sorumlusu' : cachedName;
+
+    if (uid.isEmpty) return fallback;
+
+    // Firestore'u servis katmanı üzerinden sorgula
+    return _authService.getGuideFullName(uid, defaultName: fallback);
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_GuideDashboardData>(
-      future: _dashboardFuture,
-      builder: (context, snapshot) {
-        final dashboard = snapshot.data ?? const _GuideDashboardData(guideName: 'Tur Sorumlusu');
+    return Obx(
+      () => FutureBuilder<_GuideDashboardData>(
+        future: _dashboardFuture.value,
+        builder: (context, snapshot) {
+          final dashboard = snapshot.data ?? const _GuideDashboardData(guideName: 'Tur Sorumlusu');
 
-        return Scaffold(
-          backgroundColor: AppColors.backgroundDark,
-          body: SafeArea(
-            child: RefreshIndicator(
-              onRefresh: _refreshDashboard,
-              color: AppColors.primary,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(dashboard.guideName),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 16),
-                          _buildTourTitle(
-                            dashboard.tourTitle,
-                            assignedSlotId: dashboard.assignedSlotId,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildStatCards(
-                            dashboard.totalParticipants,
-                            dashboard.checkedInParticipants,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildProgressCard(dashboard.pendingParticipants, dashboard.progress),
-                          const SizedBox(height: 24),
-                          _buildScanButton(
-                            dashboard.tourId,
-                            dashboard.tourTitle,
-                            dashboard.assignedSlotId,
-                          ),
-                          const SizedBox(height: 28),
-                          _buildManagementTools(
-                            tourId: dashboard.tourId,
-                            tourTitle: dashboard.tourTitle,
-                            checkedInCount: dashboard.checkedInParticipants,
-                            pendingCount: dashboard.pendingParticipants,
-                          ),
-                          const SizedBox(height: 24),
-                        ],
+          return Scaffold(
+            backgroundColor: AppColors.backgroundDark,
+            body: SafeArea(
+              child: RefreshIndicator(
+                onRefresh: _refreshDashboard,
+                color: AppColors.primary,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(dashboard.guideName),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 16),
+                            _buildTourTitle(
+                              dashboard.tourTitle,
+                              assignedSlotId: dashboard.assignedSlotId,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildStatCards(
+                              dashboard.totalParticipants,
+                              dashboard.checkedInParticipants,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildProgressCard(dashboard.pendingParticipants, dashboard.progress),
+                            const SizedBox(height: 24),
+                            _buildScanButton(
+                              dashboard.tourId,
+                              dashboard.tourTitle,
+                              dashboard.assignedSlotId,
+                            ),
+                            const SizedBox(height: 28),
+                            _buildManagementTools(
+                              tourId: dashboard.tourId,
+                              tourTitle: dashboard.tourTitle,
+                              checkedInCount: dashboard.checkedInParticipants,
+                              pendingCount: dashboard.pendingParticipants,
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -380,77 +372,24 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
     return Row(
       children: [
         Expanded(
-          child: _statCard(
-            'TOPLAM KATILIMCI',
-            '$totalCount',
-            totalCount == 0 ? 'Henüz katılımcı yok' : '%$occupancyPercent Katılım',
-            AppColors.success,
+          child: _StatCard(
+            label: AppStrings.totalParticipants,
+            value: '$totalCount',
+            badge: totalCount == 0 ? 'Henüz katılımcı yok' : '%$occupancyPercent Katılım',
+            badgeColor: AppColors.success,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _statCard(
-            'GİRİŞ YAPILDI',
-            '$checkedInCount',
-            totalCount == 0 ? '%0 Tamamlandı' : '%$occupancyPercent Tamamlandı',
-            AppColors.primary,
+          child: _StatCard(
+            label: AppStrings.checkedIn,
+            value: '$checkedInCount',
+            badge: totalCount == 0 ? '%0 Tamamlandı' : '%$occupancyPercent Tamamlandı',
+            badgeColor: AppColors.primary,
             suffix: '/$totalCount',
           ),
         ),
       ],
-    );
-  }
-
-  Widget _statCard(String label, String value, String badge, Color badgeColor, {String? suffix}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.slate700),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.slate400,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 8),
-          RichText(
-            text: TextSpan(
-              text: value,
-              style: const TextStyle(
-                color: AppColors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
-              children: suffix != null
-                  ? [
-                      TextSpan(
-                        text: suffix,
-                        style: const TextStyle(
-                          color: AppColors.slate400,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ]
-                  : null,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            badge,
-            style: TextStyle(color: badgeColor, fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
     );
   }
 
@@ -561,16 +500,16 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Yönetim Araçları',
+          AppStrings.managementTools,
           style: TextStyle(color: AppColors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
         // Katılımcıları Gör
-        _managementTile(
+        _ManagementTile(
           icon: Icons.checklist_rtl,
           iconColor: AppColors.success,
           iconBgColor: AppColors.primary.withOpacity(0.1),
-          title: 'Katılımcıları Gör',
+          title: AppStrings.viewParticipants,
           subtitle: null,
           badges: [
             _badge(Icons.check_circle, '$checkedInCount Giriş', AppColors.success),
@@ -588,12 +527,12 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
         ),
         const SizedBox(height: 12),
         // Duyuru Yap
-        _managementTile(
+        _ManagementTile(
           icon: Icons.campaign,
           iconColor: AppColors.warning,
           iconBgColor: AppColors.warning.withOpacity(0.12),
-          title: 'Duyuru Yap',
-          subtitle: 'Tüm katılımcılara bildirim gönder',
+          title: AppStrings.makeAnnouncement,
+          subtitle: AppStrings.notifyAllParticipants,
           onTap: !hasAssignedTour
               ? null
               : () {
@@ -605,12 +544,14 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
         ),
         const SizedBox(height: 12),
         // Sohbete Göz At
-        _managementTile(
+        _ManagementTile(
           icon: Icons.forum,
           iconColor: AppColors.success,
           iconBgColor: AppColors.success.withOpacity(0.12),
-          title: 'Sohbete Göz At',
-          subtitle: hasAssignedTour ? 'Katılımcılar ile sohbet' : 'Önce tur ataması gerekli',
+          title: AppStrings.viewChat,
+          subtitle: hasAssignedTour
+              ? AppStrings.chatWithParticipants
+              : AppStrings.tourAssignRequired,
           showDot: hasAssignedTour,
           onTap: !hasAssignedTour
               ? null
@@ -622,108 +563,6 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
                 },
         ),
       ],
-    );
-  }
-
-  Widget _managementTile({
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBgColor,
-    required String title,
-    String? subtitle,
-    List<Widget>? badges,
-    bool showNotification = false,
-    bool showDot = false,
-    VoidCallback? onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.cardDark,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.slate700),
-          ),
-          child: Row(
-            children: [
-              // Icon with optional notification badge
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: iconBgColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: iconColor, size: 24),
-                  ),
-                  if (showNotification)
-                    Positioned(
-                      top: -4,
-                      right: -4,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: AppColors.error,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.cardDark, width: 2),
-                        ),
-                        child: const Icon(Icons.person_off, color: AppColors.white, size: 8),
-                      ),
-                    ),
-                  if (showDot)
-                    Positioned(
-                      top: -4,
-                      right: -4,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: AppColors.error,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.cardDark, width: 2),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              // Text content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AppColors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(color: AppColors.slate400, fontSize: 12),
-                      ),
-                    ],
-                    if (badges != null) ...[const SizedBox(height: 6), Row(children: badges)],
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: AppColors.slate400, size: 24),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -826,6 +665,191 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
         ),
       ),
       isScrollControlled: true,
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final String badge;
+  final Color badgeColor;
+  final String? suffix;
+
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.badge,
+    required this.badgeColor,
+    this.suffix,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.slate700),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.slate400,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          RichText(
+            text: TextSpan(
+              text: value,
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+              children: suffix != null
+                  ? [
+                      TextSpan(
+                        text: suffix,
+                        style: const TextStyle(
+                          color: AppColors.slate400,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            badge,
+            style: TextStyle(color: badgeColor, fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManagementTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBgColor;
+  final String title;
+  final String? subtitle;
+  final List<Widget>? badges;
+  final bool showNotification;
+  final bool showDot;
+  final VoidCallback? onTap;
+
+  const _ManagementTile({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBgColor,
+    required this.title,
+    this.subtitle,
+    this.badges,
+    this.showNotification = false,
+    this.showDot = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.cardDark,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.slate700),
+          ),
+          child: Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: iconBgColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 24),
+                  ),
+                  if (showNotification)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.cardDark, width: 2),
+                        ),
+                        child: const Icon(Icons.person_off, color: AppColors.white, size: 8),
+                      ),
+                    ),
+                  if (showDot)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.cardDark, width: 2),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle!,
+                        style: const TextStyle(color: AppColors.slate400, fontSize: 12),
+                      ),
+                    ],
+                    if (badges != null) ...[const SizedBox(height: 6), Row(children: badges!)],
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.slate400, size: 24),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
