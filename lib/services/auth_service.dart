@@ -118,50 +118,81 @@ class AuthService {
     }
   }
 
-  /// Tur sorumlusu (rehber) girişini 'guides' koleksiyonu üzerinden doğrular.
+  /// Guide girişini Firebase Auth üzerinden yapar.
   ///
-  /// Rehberler Firebase Auth kullanmaz; kendi koleksiyonlarındaki
-  /// ID/şifre çiftiyle kimlik doğrular.
-  ///
-  /// > **Güvenlik notu:** Şifre düz metin olarak karşılaştırılır.
-  /// > Üretim ortamında sunucu tarafı hash uygulanması önerilir.
+  /// Guide hesapları Firebase Auth'da `GUIDE-ID@guide.turassist` formatındaki
+  /// sentetik e-posta ile tutulur. Kullanıcı yalnızca Guide ID girer;
+  /// bu metot otomatik olarak sentetik e-postayı üretir ve Auth'a gönderir.
+  /// Giriş başarılıysa kullanıcı profili `users` Firestore koleksiyonundan
+  /// okunarak döndürülür.
   Future<UserModel?> guideLogin(String guideId, String password) async {
+    final syntheticEmail = '${guideId.trim()}@guide.turassist';
     try {
-      final doc = await _firestore.collection('guides').doc(guideId).get();
-
-      if (!doc.exists) {
-        throw Exception("Tur sorumlusu bulunamadı");
-      }
-
-      final data = doc.data() as Map<String, dynamic>;
-      final storedPassword = data['password'] as String;
-
-      // Şifre doğrulama
-      if (storedPassword != password) {
-        throw Exception("Şifre yanlış");
-      }
-
-      final companyId = data['companyId']?.toString() ?? '';
-
-      return UserModel(
-        uid: doc.id,
-        fullName: data['fullName']?.toString() ?? 'Tur Sorumlusu',
-        email: data['email']?.toString() ?? '',
-        phone: data['phone']?.toString() ?? '',
-        role: 'guide',
-        companyId: companyId,
-        registeredCompanies: List<String>.from(
-          (data['registeredCompanies'] as List?) ?? [if (companyId.trim().isNotEmpty) companyId],
-        ),
-        tcNo: data['tcNo']?.toString() ?? '',
-        selectedCity: data['selectedCity']?.toString() ?? '',
-        profileImage: data['profileImage']?.toString(),
-        isDeleted: data['isDeleted'] == true,
-        createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: syntheticEmail,
+        password: password,
       );
+      final userId = cred.user!.uid;
+
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (!doc.exists) {
+        await _auth.signOut();
+        throw Exception('guide-profile-not-found');
+      }
+
+      final user = UserModel.fromFirestore(doc);
+      if (user.role != 'guide') {
+        await _auth.signOut();
+        throw Exception('not-a-guide');
+      }
+
+      return user;
+    } on FirebaseException catch (e) {
+      debugPrint('AuthService.guideLogin FirebaseException: ${e.code}');
+      rethrow;
     } catch (e) {
       debugPrint('AuthService.guideLogin Error: $e');
-      throw Exception(e.toString());
+      rethrow;
+    }
+  }
+
+  /// Customer (fiziksel satış müşterisi) girişini Firebase Auth üzerinden yapar.
+  ///
+  /// Müşteri hesapları `@customer.turassist` domainli sentetik e-posta ile
+  /// Firebase Auth'da tutulur. Firestore `users` koleksiyonunda profili varsa
+  /// oradan okur; yoksa Firebase Auth verisinden minimal bir [UserModel] oluşturur.
+  Future<UserModel?> customerLogin(String email, String password) async {
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
+      final userId = cred.user!.uid;
+
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        return UserModel.fromFirestore(doc);
+      }
+
+      // Firestore profili henüz oluşturulmamış sentetik müşteri hesapları
+      // için Firebase Auth bilgilerinden minimal bir model döndür.
+      return UserModel(
+        uid: userId,
+        fullName: cred.user!.displayName ?? 'Müşteri',
+        email: email,
+        phone: '',
+        role: 'customer',
+        companyId: '',
+        registeredCompanies: [],
+        tcNo: '',
+        selectedCity: '',
+        profileImage: null,
+        isDeleted: false,
+        createdAt: DateTime.now(),
+      );
+    } on FirebaseException catch (e) {
+      debugPrint('AuthService.customerLogin FirebaseException: ${e.code}');
+      rethrow;
+    } catch (e) {
+      debugPrint('AuthService.customerLogin Error: $e');
+      rethrow;
     }
   }
 

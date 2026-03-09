@@ -343,6 +343,8 @@ class _TourManagerHomeScreenState extends State<TourManagerHomeScreen> {
             fontWeight: FontWeight.bold,
             letterSpacing: -0.5,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         if (formattedDate != null) ...[
           const SizedBox(height: 6),

@@ -34,7 +34,7 @@ class TourManagerCustomersController extends GetxController {
   final RxString searchQuery = ''.obs;
 
   String tourId = '';
-  String tourTitle = '';
+  final RxString tourTitle = ''.obs;
 
   /// [selectedTab] ve [searchQuery]'ye göre filtrelenmiş katılımcı listesi.
   List<ParticipantItem> get filteredParticipants {
@@ -56,7 +56,7 @@ class TourManagerCustomersController extends GetxController {
   /// [tourId] ve [tourTitle] argümanlarını Set edip katılımcıları yükler.
   Future<void> init({required String tourId, required String tourTitle}) async {
     this.tourId = tourId;
-    this.tourTitle = tourTitle;
+    this.tourTitle.value = tourTitle;
     await loadParticipants();
   }
 
@@ -79,7 +79,7 @@ class TourManagerCustomersController extends GetxController {
         final assignedTour = await _firebaseService.getAssignedTourForGuide(guideId);
         if (assignedTour != null) {
           tourId = assignedTour.id;
-          if (tourTitle.isEmpty) tourTitle = assignedTour.title;
+          if (tourTitle.value.isEmpty) tourTitle.value = assignedTour.title;
         }
       }
     }

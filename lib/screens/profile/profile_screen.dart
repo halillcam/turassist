@@ -64,9 +64,11 @@ class ProfileScreen extends StatelessWidget {
               _buildProfileHeader(controller, user),
               const SizedBox(height: 32),
 
-              // Menu Items
-              _buildMenuCard(controller),
-              const SizedBox(height: 24),
+              // Sentetik kullanıcılar menüyü görmez, sadece çıkış yapabilir
+              if (!controller.isSyntheticUser) ...[
+                _buildMenuCard(controller),
+                const SizedBox(height: 24),
+              ],
 
               // Logout Button
               _buildLogoutButton(controller),
@@ -75,7 +77,11 @@ class ProfileScreen extends StatelessWidget {
           ),
         );
       }),
-      bottomNavigationBar: BottomNavBar(activeIndex: 2, onItemTapped: _onItemTapped),
+      bottomNavigationBar: BottomNavBar(
+        activeIndex: 2,
+        onItemTapped: _onItemTapped,
+        hideHome: Get.find<ProfileController>().isSyntheticUser,
+      ),
     );
   }
 

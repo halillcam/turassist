@@ -35,23 +35,47 @@ class LoginController extends GetxController {
 
   // ─── Giriş İşlemleri ───
 
-  /// E-posta ve şifre ile giriş yapar.
+  /// E-posta veya Guide ID ile giriş yapar.
   ///
   /// İş akışı:
-  /// 1. Firebase Auth üzerinden giriş ve yetki kontrolü
-  /// 2. E-posta doğrulama kontrolü (doğrulanmamışsa doğrulama ekranına yönlendir)
-  /// 3. Başarılıysa role ve şehir seçimine göre yönlendirme
-  Future<void> login(String email, String password, String companyId) async {
+  /// 1. Guide ID tespiti: @ içermiyor ve yalnızca harf/rakam/tire ise guide girişi
+  /// 2. Aksi halde normal Firebase Auth e-posta girişi
+  /// 3. E-posta doğrulama kontrolü (yalnızca normal kullanıcılar için)
+  /// 4. Başarılıysa role ve şehir seçimine göre yönlendirme
+  Future<void> login(String emailOrGuideId, String password, String companyId) async {
+    // Guide ID tespiti: @ yoksa ve yalnızca harf/rakam/tire içeriyorsa
+    if (!emailOrGuideId.contains('@') && RegExp(r'^[A-Za-z0-9\-]+$').hasMatch(emailOrGuideId)) {
+      await guideLogin(emailOrGuideId, password);
+      return;
+    }
+
+    // Sentetik müşteri domain'i: doğrudan customerLogin akışına yönlendir
+    if (emailOrGuideId.toLowerCase().endsWith('@customer.turassist')) {
+      await customerDomainLogin(emailOrGuideId, password);
+      return;
+    }
+
     try {
       isLoading.value = true;
 
-      final UserModel? user = await _firebaseService.loginAndCheckAuth(email, password, companyId);
+      final UserModel? user = await _firebaseService.loginAndCheckAuth(
+        emailOrGuideId,
+        password,
+        companyId,
+      );
 
       if (user == null) return;
 
-      // E-posta doğrulama kontrolü
+      // Sentetik e-posta domain'leri için e-posta doğrulaması atlanır.
+      // Firebase Auth'daki gerçek email kullanılır (Firestore'daki alana bağımlı değil).
+      //   *@guide.turassist    → guide hesapları
+      //   *@customer.turassist → fiziksel satış müşteri hesapları
       final firebaseUser = FirebaseAuth.instance.currentUser;
-      if (firebaseUser != null && !firebaseUser.emailVerified) {
+      final authEmail = firebaseUser?.email ?? '';
+      final isSyntheticEmail =
+          authEmail.endsWith('@guide.turassist') || authEmail.endsWith('@customer.turassist');
+
+      if (!isSyntheticEmail && !firebaseUser!.emailVerified) {
         Get.offAllNamed('/email-verification');
         return;
       }
@@ -73,6 +97,24 @@ class LoginController extends GetxController {
       isLoading.value = true;
 
       final UserModel? user = await _firebaseService.guideLogin(guideId, password);
+
+      if (user == null) return;
+
+      _showSuccess('Hoşgeldiniz ${user.fullName}');
+      await _navigateAfterAuth(user);
+    } catch (e) {
+      _showError(_friendlyErrorMessage(e));
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Sentetik @customer.turassist domain hesabıyla giriş yapar.
+  Future<void> customerDomainLogin(String email, String password) async {
+    try {
+      isLoading.value = true;
+
+      final UserModel? user = await _firebaseService.customerLogin(email, password);
 
       if (user == null) return;
 
@@ -188,6 +230,7 @@ class LoginController extends GetxController {
       case 'guide':
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('is_guide_session', true);
+        // Firestore tours.guideId → Firebase Auth UID formatında saklanır
         await prefs.setString('guide_id', user.uid);
         await prefs.setString('guide_name', user.fullName);
         Get.offAllNamed(AppRoutes.guideDashboard);
@@ -205,7 +248,14 @@ class LoginController extends GetxController {
         await prefs.remove('guide_id');
         await prefs.remove('guide_name');
 
-        // customer / guest → şehir seçimi kontrol et
+        // Sentetik domain müşterileri (fiziksel satış) direkt Turlarım ekranına gider
+        final authEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+        if (authEmail.endsWith('@customer.turassist')) {
+          Get.offAllNamed(AppRoutes.myTours);
+          return;
+        }
+
+        // Normal customer → şehir seçimi kontrol et
         final savedCity = prefs.getString('selected_city') ?? '';
 
         if (savedCity.isNotEmpty) {
@@ -231,10 +281,10 @@ class LoginController extends GetxController {
 
     // Firebase Auth hata kodları
     if (msg.contains('user-not-found')) {
-      return 'Bu e-posta adresiyle kayıtlı bir hesap bulunamadı.';
+      return 'Bu Guide ID veya e-posta adresiyle kayıtlı bir hesap bulunamadı.';
     }
     if (msg.contains('wrong-password') || msg.contains('invalid-credential')) {
-      return 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.';
+      return 'Guide ID/e-posta veya şifre hatalı. Lütfen tekrar deneyin.';
     }
     if (msg.contains('email-already-in-use')) {
       return 'Bu e-posta adresi zaten kullanılıyor.';
@@ -252,7 +302,7 @@ class LoginController extends GetxController {
       return 'İnternet bağlantınızı kontrol edin.';
     }
     if (msg.contains('user-disabled')) {
-      return 'Bu hesap devre dışı bırakılmış.';
+      return 'Bu hesap devre dışı bırakılmış. Lütfen yönetici ile iletişime geçin.';
     }
     if (msg.contains('operation-not-allowed')) {
       return 'Bu işlem şu an kullanılamıyor.';
@@ -265,11 +315,14 @@ class LoginController extends GetxController {
     if (msg.contains('admin hesaplar')) {
       return 'Bu hesap mobil uygulamada kullanılamaz. Web admin panelini kullanınız.';
     }
-    if (msg.contains('tur sorumlusu bulunamadı')) {
-      return 'Tur sorumlusu bulunamadı. Lütfen bilgilerinizi kontrol edin.';
+    if (msg.contains('guide-profile-not-found') || msg.contains('tur sorumlusu bulunamadı')) {
+      return 'Guide profili bulunamadı. Lütfen yönetici ile iletişime geçin.';
+    }
+    if (msg.contains('not-a-guide')) {
+      return 'Bu hesap bir guide hesabı değil. Lütfen doğru giriş yöntemini seçin.';
     }
     if (msg.contains('şifre yanlış')) {
-      return 'Şifre hatalı. Lütfen tekrar deneyin.';
+      return 'Guide ID veya şifre hatalı. Lütfen tekrar deneyin.';
     }
 
     return 'Bir hata oluştu. Lütfen tekrar deneyin.';

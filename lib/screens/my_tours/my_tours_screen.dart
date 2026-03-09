@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -50,19 +51,14 @@ class MyToursScreen extends StatelessWidget {
           return _TicketListView(controller: controller);
         }),
       ),
-      bottomNavigationBar: BottomNavBar(activeIndex: 1, onItemTapped: _onItemTapped),
-      floatingActionButton: Obx(() {
-        if (!controller.hasCheckedIn) return const SizedBox.shrink();
-        return FloatingActionButton.extended(
-          onPressed: controller.backToTicketList,
-          backgroundColor: AppColors.slate700,
-          icon: const Icon(Icons.undo, color: Colors.white, size: 20),
-          label: const Text(
-            'Listeye Dön',
-            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-        );
-      }),
+      bottomNavigationBar: BottomNavBar(
+        activeIndex: 1,
+        onItemTapped: _onItemTapped,
+        hideHome: () {
+          final email = FirebaseAuth.instance.currentUser?.email ?? '';
+          return email.endsWith('@guide.turassist') || email.endsWith('@customer.turassist');
+        }(),
+      ),
     );
   }
 }
@@ -418,14 +414,9 @@ class _ActiveTourDetailView extends StatelessWidget {
 
   Widget _buildAppBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          IconButton(
-            onPressed: Get.back,
-            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
-            splashRadius: 24,
-          ),
           const Expanded(
             child: Text(
               'Aktif Tur Detayları',

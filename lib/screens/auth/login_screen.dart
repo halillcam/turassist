@@ -90,14 +90,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     _buildTourManagerLink(),
 
                     const SizedBox(height: 16),
-
-                    // Test butonları
-                    _buildTestCitySelectionButton(),
-                    const SizedBox(height: 8),
-                    _buildTestTourDataButton(),
-                    _buildTestTourManagerButton(),
-
-                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -205,19 +197,21 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Email Input Field
+  // Email / Guide ID Input Field
   Widget _buildEmailField() {
     return AuthInputField(
-      label: 'E-posta Adresi',
-      hint: 'eposta@ornek.com',
+      label: 'Guide ID veya E-posta',
+      hint: 'GUIDE-4821 veya eposta@ornek.com',
       prefixIcon: Icons.mail,
       controller: _emailController,
       validator: (value) {
         if (value == null || value.isEmpty) {
-          return 'E-posta adresi gerekli';
+          return 'E-posta veya Guide ID gerekli';
         }
-        if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-          return 'Geçerli bir e-posta adresi girin';
+        // Guide ID formatı: @ içermiyor, yalnızca harf/rakam/tire
+        final isGuideId = !value.contains('@') && RegExp(r'^[A-Za-z0-9\-]+$').hasMatch(value);
+        if (!isGuideId && !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+          return 'Geçerli bir e-posta veya Guide ID girin';
         }
         return null;
       },
@@ -375,54 +369,5 @@ class _LoginScreenState extends State<LoginScreen> {
   // Google Sign In Fonksiyonu
   void _handleGoogleSignIn() {
     _loginController.signInWithGoogle();
-  }
-
-  // ─── Test Butonları ───
-
-  Widget _buildTestCitySelectionButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: () => Get.toNamed('/city-selection'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.success.withOpacity(0.8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: const Text('TEST: Şehir Seçme Ekranına Git', style: TextStyle(color: Colors.white)),
-      ),
-    );
-  }
-
-  Widget _buildTestTourDataButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () => Get.toNamed('/test-tour'),
-        icon: const Icon(Icons.science, color: Colors.white, size: 18),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.deepPurple.withOpacity(0.8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        label: const Text(
-          'TEST: Tur Verisi Ekle (Firestore)',
-          style: TextStyle(color: Colors.white),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTestTourManagerButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () => Get.toNamed('/tour-manager-home'),
-        icon: const Icon(Icons.admin_panel_settings, color: Colors.white, size: 18),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.teal.withOpacity(0.8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        label: const Text('TEST: Tur Sorumlusu Paneli', style: TextStyle(color: Colors.white)),
-      ),
-    );
   }
 }

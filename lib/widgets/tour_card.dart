@@ -102,7 +102,7 @@ class TourCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            'Max ${tour.capacity} Kişi',
+                            '${tour.capacity} Kişi',
                             style: const TextStyle(
                               color: AppColors.slate400,
                               fontSize: 11,

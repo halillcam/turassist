@@ -56,8 +56,10 @@ class _TourManagerLoginScreenState extends State<TourManagerLoginScreen> {
                   controller: _guideIdController,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    labelText: 'Tur Sorumlusu ID',
+                    labelText: 'Guide ID',
+                    hintText: 'Örnek: GUIDE-4821',
                     labelStyle: const TextStyle(color: AppColors.slate300),
+                    hintStyle: const TextStyle(color: AppColors.slate300),
                     filled: true,
                     fillColor: AppColors.cardDark,
                     border: OutlineInputBorder(
@@ -71,7 +73,7 @@ class _TourManagerLoginScreenState extends State<TourManagerLoginScreen> {
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'ID gerekli';
+                      return 'Guide ID gerekli';
                     }
                     return null;
                   },

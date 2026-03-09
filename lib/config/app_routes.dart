@@ -12,7 +12,6 @@ import '../screens/my_tours/tour_announcements_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/qr/my_qr_screen.dart';
 import '../screens/qr/qr_scanner_screen.dart';
-import '../screens/test/test_tour_screen.dart';
 import '../models/tour_model.dart';
 import '../screens/tour/tour_detail_screen.dart';
 import '../screens/tour/tour_list_screen.dart';
@@ -43,7 +42,6 @@ abstract class AppRoutes {
   static const String qrScanner = '/qr-scanner';
   static const String tourManagerChat = '/tour-manager-chat';
   static const String tourManagerCustomers = '/tour-manager-customers';
-  static const String testTour = '/test-tour';
 }
 
 class AppPages {
@@ -138,12 +136,6 @@ class AppPages {
       name: AppRoutes.tourAnnouncements,
       page: () => const TourAnnouncementsScreen(),
       transition: Transition.rightToLeft,
-    ),
-    // Test
-    GetPage(
-      name: AppRoutes.testTour,
-      page: () => const TestTourScreen(),
-      transition: Transition.fadeIn,
     ),
   ];
 }

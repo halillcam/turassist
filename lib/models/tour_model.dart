@@ -40,6 +40,7 @@ class TourModel {
   final double price;
   final String imageUrl;
   final String companyId;
+  final String? companyName;
   final String guideId;
   final String? guideName;
   final int capacity;
@@ -75,6 +76,7 @@ class TourModel {
     required this.price,
     required this.imageUrl,
     required this.companyId,
+    this.companyName,
     required this.guideId,
     this.guideName,
     required this.capacity,
@@ -121,6 +123,7 @@ class TourModel {
       price: (data['price'] ?? 0).toDouble(),
       imageUrl: data['imageUrl'] ?? '',
       companyId: data['companyId'] ?? '',
+      companyName: data['companyName']?.toString(),
       guideId: data['guideId'] ?? '',
       guideName: data['guideName'],
       capacity: data['capacity'] ?? 0,
@@ -154,6 +157,7 @@ class TourModel {
       'price': price,
       'imageUrl': imageUrl,
       'companyId': companyId,
+      'companyName': companyName,
       'guideId': guideId,
       'guideName': guideName,
       'capacity': capacity,

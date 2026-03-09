@@ -104,8 +104,10 @@ class _TourManagerCustomersScreenState extends State<TourManagerCustomersScreen>
                 const SizedBox(height: 2),
                 Obx(
                   () => Text(
-                    _ctrl.tourTitle.isEmpty ? 'Atanmış tur yok' : _ctrl.tourTitle,
+                    _ctrl.tourTitle.value.isEmpty ? 'Atanmış tur yok' : _ctrl.tourTitle.value,
                     style: const TextStyle(color: AppColors.slate400, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],

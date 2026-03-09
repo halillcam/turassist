@@ -20,12 +20,9 @@ class TourService {
   /// Silinmemiş (isDeleted: false) tüm aktif turları getirir.
   Future<List<TourModel>> getActiveTours() async {
     try {
-      final snapshot = await _firestore
-          .collection('tours')
-          .where('isDeleted', isEqualTo: false)
-          .get();
+      final snapshot = await _firestore.collection('tours').get();
 
-      return snapshot.docs.map(TourModel.fromFirestore).toList();
+      return snapshot.docs.map(TourModel.fromFirestore).where((t) => !t.isDeleted).toList();
     } catch (e) {
       debugPrint('TourService.getActiveTours Error: $e');
       return [];
@@ -35,13 +32,9 @@ class TourService {
   /// Belirtilen şehre ait silinmemiş turları getirir.
   Future<List<TourModel>> getToursByCity(String city) async {
     try {
-      final snapshot = await _firestore
-          .collection('tours')
-          .where('city', isEqualTo: city)
-          .where('isDeleted', isEqualTo: false)
-          .get();
+      final snapshot = await _firestore.collection('tours').where('city', isEqualTo: city).get();
 
-      return snapshot.docs.map(TourModel.fromFirestore).toList();
+      return snapshot.docs.map(TourModel.fromFirestore).where((t) => !t.isDeleted).toList();
     } catch (e) {
       debugPrint('TourService.getToursByCity Error: $e');
       return [];
@@ -86,12 +79,12 @@ class TourService {
       final snapshot = await _firestore
           .collection('tours')
           .where('guideId', isEqualTo: guideId)
-          .where('isDeleted', isEqualTo: false)
           .get();
 
       if (snapshot.docs.isEmpty) return null;
 
-      final tours = snapshot.docs.map(TourModel.fromFirestore).toList();
+      final tours = snapshot.docs.map(TourModel.fromFirestore).where((t) => !t.isDeleted).toList();
+      if (tours.isEmpty) return null;
       tours.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return tours.first;
     } catch (e) {

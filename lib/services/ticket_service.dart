@@ -40,6 +40,12 @@ class TicketService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  int _readCapacity(Map<String, dynamic>? data) {
+    final raw = data?['capacity'];
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '') ?? 0;
+  }
+
   // ==================== QR YARDIMCI METOTLARı ====================
 
   /// QR token string'inden baştaki/sondaki boşluk ve satır sonlarını temizler.
@@ -158,19 +164,28 @@ class TicketService {
         userId: ticket.userId,
       );
 
-      // Bilet + token'ı birlikte yaz
-      final payload = ticket.toJson();
-      payload['qrToken'] = qrToken;
-      await docRef.set(payload);
+      await _firestore.runTransaction((transaction) async {
+        final tourSnap = await transaction.get(tourRef);
+        if (!tourSnap.exists) {
+          throw Exception('Tur bulunamadı');
+        }
 
-      // İlişki alanlarını best-effort güncelle (Rules reddedebilir)
-      try {
-        await tourRef.set({
+        final tourData = tourSnap.data();
+        final currentCapacity = _readCapacity(tourData);
+        if (currentCapacity <= 0) {
+          throw Exception('Bu turda bos kontenjan kalmadi');
+        }
+
+        final payload = ticket.toJson();
+        payload['qrToken'] = qrToken;
+
+        transaction.set(docRef, payload);
+        transaction.update(tourRef, {
+          'capacity': currentCapacity - 1,
           'registeredUserIds': FieldValue.arrayUnion([ticket.userId]),
-        }, SetOptions(merge: true));
-      } catch (e) {
-        debugPrint('TicketService.createTicket: tour registeredUserIds güncellenemedi: $e');
-      }
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
 
       try {
         await userRef.set({
@@ -578,9 +593,33 @@ class TicketService {
   /// Başarılıysa `true`, hata durumunda `false` döner.
   Future<bool> updateTicketStatus(String ticketId, String newStatus) async {
     try {
-      await _firestore.collection('tickets').doc(ticketId).update({
-        'status': newStatus,
-        'updatedAt': FieldValue.serverTimestamp(),
+      final ticketRef = _firestore.collection('tickets').doc(ticketId);
+      await _firestore.runTransaction((transaction) async {
+        final ticketSnap = await transaction.get(ticketRef);
+        if (!ticketSnap.exists) {
+          throw Exception('Bilet bulunamadi');
+        }
+
+        final ticketData = ticketSnap.data();
+        final previousStatus = ticketData?['status']?.toString() ?? '';
+        final tourId = ticketData?['tourId']?.toString().trim() ?? '';
+
+        if (newStatus == 'cancelled' && previousStatus != 'cancelled' && tourId.isNotEmpty) {
+          final tourRef = _firestore.collection('tours').doc(tourId);
+          final tourSnap = await transaction.get(tourRef);
+          if (tourSnap.exists) {
+            final currentCapacity = _readCapacity(tourSnap.data());
+            transaction.update(tourRef, {
+              'capacity': currentCapacity + 1,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+
+        transaction.update(ticketRef, {
+          'status': newStatus,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       });
       return true;
     } catch (e) {

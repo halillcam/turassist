@@ -8,11 +8,15 @@ class BottomNavBar extends StatelessWidget {
   final Function(int) onItemTapped;
   final Map<int, String?>? badges;
 
+  /// true ise Anasayfa sekmesi gizlenir (sentetik domain kullanıcıları için)
+  final bool hideHome;
+
   const BottomNavBar({
     super.key,
     required this.activeIndex,
     required this.onItemTapped,
     this.badges,
+    this.hideHome = false,
   });
 
   @override
@@ -30,13 +34,14 @@ class BottomNavBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              NavItem(
-                icon: Icons.home,
-                label: 'Anasayfa',
-                isActive: activeIndex == 0,
-                badge: badges?[0],
-                onTap: () => onItemTapped(0),
-              ),
+              if (!hideHome)
+                NavItem(
+                  icon: Icons.home,
+                  label: 'Anasayfa',
+                  isActive: activeIndex == 0,
+                  badge: badges?[0],
+                  onTap: () => onItemTapped(0),
+                ),
               NavItem(
                 icon: Icons.confirmation_number,
                 label: 'Turlarım',

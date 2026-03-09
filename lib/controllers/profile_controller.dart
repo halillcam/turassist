@@ -29,6 +29,15 @@ class ProfileController extends GetxController {
     return isGoogle && !hasPassword;
   }
 
+  /// Sentetik domain ile giriş yapmış mı?
+  /// Bu kullanıcılar profil düzenleyemez, ana sayfa görmez.
+  ///   *@guide.turassist    → guide hesapları
+  ///   *@customer.turassist → fiziksel satış müşteri hesapları
+  bool get isSyntheticUser {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    return email.endsWith('@guide.turassist') || email.endsWith('@customer.turassist');
+  }
+
   @override
   void onInit() {
     super.onInit();

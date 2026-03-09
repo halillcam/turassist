@@ -11,7 +11,6 @@ import '../../controllers/tour_detail_controller.dart';
 import '../../models/tour_model.dart';
 import '../../models/tour_program_model.dart';
 import '../../services/auth_service.dart';
-import '../../services/ticket_service.dart';
 
 class TourDetailScreen extends StatefulWidget {
   /// Serideki tüm turlar (aynı turun farklı tarihleri). İlk eleman display için kullanılır.
@@ -28,7 +27,6 @@ class TourDetailScreen extends StatefulWidget {
 class _TourDetailScreenState extends State<TourDetailScreen> {
   // Servis katmanlı state artık controller'da yaşıyor — setState gerekmez.
   late final TourDetailController _ctrl;
-  final TicketService _ticketService = TicketService();
   final AuthService _authService = AuthService();
 
   @override
@@ -37,6 +35,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     // Her TourDetailScreen örneği kendi tag'lı controller'ını kullanır.
     _ctrl = Get.put(TourDetailController(), tag: widget._displayTour.id);
     _ctrl.loadTourProgram(widget._displayTour.id);
+    _ctrl.loadCompanyName(
+      widget._displayTour.companyId,
+      initialCompanyName: widget._displayTour.companyName,
+    );
   }
 
   @override
@@ -163,13 +165,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     options.sort((a, b) => a.date.compareTo(b.date));
     if (options.isEmpty) return null;
 
-    final slotIds = options.map((o) => DateFormat('yyyy-MM-dd').format(o.date)).toList();
-    final counts = <String, int>{};
-    for (var i = 0; i < options.length; i++) {
-      final c = await _ticketService.getSlotTicketCounts(options[i].tour.id, [slotIds[i]]);
-      counts[slotIds[i]] = c[slotIds[i]] ?? 0;
-    }
-
     if (!mounted) return null;
 
     return showModalBottomSheet<({TourModel tour, DateTime date})>(
@@ -213,9 +208,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   ],
                   const SizedBox(height: 16),
                   ...options.map((opt) {
-                    final sid = DateFormat('yyyy-MM-dd').format(opt.date);
-                    final sold = counts[sid] ?? 0;
-                    final remaining = opt.tour.capacity - sold;
+                    final remaining = opt.tour.capacity;
                     final isFull = remaining <= 0;
 
                     return Padding(
@@ -746,17 +739,24 @@ class _TourInfoCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          tour.companyId,
-                          style: const TextStyle(
-                            color: AppColors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Obx(() {
+                          final ctrl = Get.find<TourDetailController>(tag: tour.id);
+                          final fallbackName = tour.companyName?.trim() ?? '';
+                          final name = ctrl.companyName.value.trim();
+                          return Text(
+                            name.isNotEmpty
+                                ? name
+                                : (fallbackName.isNotEmpty ? fallbackName : tour.companyId),
+                            style: const TextStyle(
+                              color: AppColors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        }),
                       ],
                     ),
                   ),
