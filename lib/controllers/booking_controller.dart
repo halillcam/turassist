@@ -16,6 +16,19 @@ class BookingController extends GetxController {
   var myTickets = <TicketModel>[].obs;
   var isLoading = false.obs;
 
+  String _mapPurchaseError(Object error) {
+    final raw = error.toString().replaceFirst('Exception: ', '').trim();
+
+    switch (raw) {
+      case 'ticket-create-permission-denied':
+        return 'Bilet oluşturma izni reddedildi. Firestore kuralları tickets yazımına izin vermiyor.';
+      case 'Bilet oluşturma başarısız: ticket-create-permission-denied':
+        return 'Bilet oluşturma izni reddedildi. Firestore kuralları tickets yazımına izin vermiyor.';
+      default:
+        return 'Satın alma işlemi başarısız: $raw';
+    }
+  }
+
   @override
   void onInit() {
     fetchMyTickets();
@@ -121,7 +134,7 @@ class BookingController extends GetxController {
       debugPrint('PURCHASE: HATA → $e');
       Get.snackbar(
         'Hata',
-        'Satın alma işlemi başarısız: $e',
+        _mapPurchaseError(e),
         backgroundColor: AppColors.error,
         colorText: Colors.white,
       );

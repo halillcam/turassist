@@ -37,9 +37,3 @@ This project sends tour announcements only to users who have scanned their QR fo
 	- `npm install`
 3. Deploy:
 	- `firebase deploy --only functions`
-
-## TEST fallback (No Blaze)
-
-- Geçici fallback dokümanı: `doc/TEST_LOCAL_NOTIFICATION_FALLBACK.md`
-- Etiket: `TEST_LOCAL_NOTIFICATION_FALLBACK`
-- Amaç: Blaze yokken, app açık/arka plandayken ilgili tur duyurularını local notification olarak göstermek.

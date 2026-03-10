@@ -41,8 +41,8 @@ class _MyQrScreenState extends State<MyQrScreen> {
     _ticket = ticket;
     _tourTitle = tourTitle;
 
-    // Bilet belgesini gerçek zamanlı dinle — rehber QR okuttuğunda
-    // isScanned true olur ve kullanıcı otomatik aktif tur ekranına yönlendirilir.
+    // Bilet belgesini gerçek zamanlı dinle — yalnızca gerçekten okutulduğunda
+    // aktif tur ekranına dön.
     if (ticket != null && ticket.id.isNotEmpty) {
       _ticketSub = FirebaseFirestore.instance
           .collection('tickets')
@@ -56,7 +56,7 @@ class _MyQrScreenState extends State<MyQrScreen> {
             final isScanned = data['isScanned'] == true;
             final status = data['status']?.toString() ?? '';
 
-            if (isScanned || status == 'checked_in') {
+            if (isScanned && status != 'cancelled' && status != 'completed') {
               _navigated = true;
               _ticketSub?.cancel();
 

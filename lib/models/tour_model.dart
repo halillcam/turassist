@@ -18,7 +18,7 @@ class BusInfo {
       driverName: map['driverName'] ?? '',
       phoneNumber: map['phoneNumber'] ?? '',
       plate: map['plate'] ?? '',
-      capacity: map['capacity'] ?? 0,
+      capacity: 0,
     );
   }
 

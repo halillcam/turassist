@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_routes.dart';
 import '../config/colors.dart';
@@ -69,7 +70,21 @@ class ProfileController extends GetxController {
   /// Kullanıcıyı çıkış yaptırır ve tur listesine geri döner.
   Future<void> logout() async {
     try {
-      await _googleAuthService.signOut();
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      final isGoogleUser =
+          firebaseUser?.providerData.any((p) => p.providerId == 'google.com') ?? false;
+
+      if (isGoogleUser) {
+        await _googleAuthService.signOut();
+      } else {
+        await _firebaseService.logout();
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('is_guide_session');
+      await prefs.remove('guide_id');
+      await prefs.remove('guide_name');
+
       user.value = null;
       Get.offAllNamed(AppRoutes.tourList);
     } catch (e) {

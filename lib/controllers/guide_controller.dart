@@ -113,11 +113,11 @@ class GuideController extends GetxController {
   Future<void> finishTour(String tourId, String guideId) async {
     try {
       isLoading.value = true;
-      await _firebaseService.finishTour(tourId, guideId);
+      await _firebaseService.requestTourCompletion(tourId: tourId, guideId: guideId);
 
       Get.snackbar(
         "Başarılı",
-        "Tur bitirme talebi şirkete gönderildi. Onay bekleniyor...",
+        "Talep admin onayına gönderildi.",
         backgroundColor: AppColors.success,
         colorText: Colors.white,
       );
@@ -129,7 +129,7 @@ class GuideController extends GetxController {
     } catch (e) {
       Get.snackbar(
         "Hata",
-        "Turu bitirme başarısız: $e",
+        "Tur bitirme talebi oluşturulamadı: $e",
         backgroundColor: AppColors.error,
         colorText: Colors.white,
       );

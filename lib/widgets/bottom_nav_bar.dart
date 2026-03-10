@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../config/colors.dart';
 import 'nav_item.dart';
@@ -19,6 +20,20 @@ class BottomNavBar extends StatelessWidget {
     this.hideHome = false,
   });
 
+  void _handleTap(int index) {
+    if (index == activeIndex) return;
+    if (Get.isOverlaysOpen) {
+      Get.closeAllSnackbars();
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+      if (Get.isBottomSheetOpen ?? false) {
+        Get.back();
+      }
+    }
+    onItemTapped(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -35,26 +50,32 @@ class BottomNavBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (!hideHome)
-                NavItem(
-                  icon: Icons.home,
-                  label: 'Anasayfa',
-                  isActive: activeIndex == 0,
-                  badge: badges?[0],
-                  onTap: () => onItemTapped(0),
+                Expanded(
+                  child: NavItem(
+                    icon: Icons.home,
+                    label: 'Anasayfa',
+                    isActive: activeIndex == 0,
+                    badge: badges?[0],
+                    onTap: () => _handleTap(0),
+                  ),
                 ),
-              NavItem(
-                icon: Icons.confirmation_number,
-                label: 'Turlarım',
-                isActive: activeIndex == 1,
-                badge: badges?[1],
-                onTap: () => onItemTapped(1),
+              Expanded(
+                child: NavItem(
+                  icon: Icons.confirmation_number,
+                  label: 'Turlarım',
+                  isActive: activeIndex == 1,
+                  badge: badges?[1],
+                  onTap: () => _handleTap(1),
+                ),
               ),
-              NavItem(
-                icon: Icons.person_outline,
-                label: 'Profil',
-                isActive: activeIndex == 2,
-                badge: badges?[2],
-                onTap: () => onItemTapped(2),
+              Expanded(
+                child: NavItem(
+                  icon: Icons.person_outline,
+                  label: 'Profil',
+                  isActive: activeIndex == 2,
+                  badge: badges?[2],
+                  onTap: () => _handleTap(2),
+                ),
               ),
             ],
           ),

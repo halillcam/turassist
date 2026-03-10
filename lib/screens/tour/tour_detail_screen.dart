@@ -746,7 +746,7 @@ class _TourInfoCard extends StatelessWidget {
                           return Text(
                             name.isNotEmpty
                                 ? name
-                                : (fallbackName.isNotEmpty ? fallbackName : tour.companyId),
+                                : (fallbackName.isNotEmpty ? fallbackName : 'Firma bilgisi yok'),
                             style: const TextStyle(
                               color: AppColors.white,
                               fontSize: 14,

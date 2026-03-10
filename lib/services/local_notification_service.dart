@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 @pragma('vm:entry-point')
@@ -18,15 +19,18 @@ class LocalNotificationService {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _userNotificationsSubscription;
   StreamSubscription<RemoteMessage>? _fcmForegroundSubscription;
   StreamSubscription<String>? _fcmTokenRefreshSubscription;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _testCheckedInTicketsSubscription;
-  final Map<String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>
-  _testTourAnnouncementSubscriptions =
-      <String, StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>{};
   final Set<String> _shownNotificationIds = <String>{};
 
   DateTime _sessionStartedAt = DateTime.now();
   bool _initialized = false;
-  static const String _testFallbackTag = 'TEST_LOCAL_NOTIFICATION_FALLBACK';
+  static const bool _enableFcmTokenSync = false;
+
+  bool get _supportsFirebaseMessaging {
+    if (kIsWeb) return true;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -46,9 +50,11 @@ class LocalNotificationService {
   }
 
   Future<void> _requestPermissions() async {
-    try {
-      await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true);
-    } catch (_) {}
+    if (_supportsFirebaseMessaging && _enableFcmTokenSync) {
+      try {
+        await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true);
+      } catch (_) {}
+    }
 
     final android = _plugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -59,6 +65,12 @@ class LocalNotificationService {
   }
 
   Future<void> _setupFirebaseMessaging() async {
+    if (!_supportsFirebaseMessaging) {
+      await _fcmForegroundSubscription?.cancel();
+      _fcmForegroundSubscription = null;
+      return;
+    }
+
     try {
       await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
         alert: true,
@@ -86,130 +98,23 @@ class LocalNotificationService {
     _authSubscription?.cancel();
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) async {
       await _subscribeToUserNotifications(user?.uid);
-      await _syncFcmToken(user?.uid);
-      await _startTestAnnouncementFallback(user?.uid);
     });
 
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     _subscribeToUserNotifications(currentUid);
-    _syncFcmToken(currentUid);
-    _startTestAnnouncementFallback(currentUid);
 
     _fcmTokenRefreshSubscription?.cancel();
+    if (!_supportsFirebaseMessaging || !_enableFcmTokenSync) {
+      _fcmTokenRefreshSubscription = null;
+      return;
+    }
+
     _fcmTokenRefreshSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((token) {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null && uid.isNotEmpty) {
         _saveFcmToken(uid, token);
       }
     });
-  }
-
-  // TEST ETIKETI:
-  // Blaze/Firebase Functions push aktif edilene kadar geçici local notification fallback.
-  // App açık/arka plandayken Firestore stream ile duyuruları dinler.
-  Future<void> _startTestAnnouncementFallback(String? userId) async {
-    await _testCheckedInTicketsSubscription?.cancel();
-    _testCheckedInTicketsSubscription = null;
-    await _cancelAllTestAnnouncementSubscriptions();
-
-    if (userId == null || userId.isEmpty) {
-      return;
-    }
-
-    final ticketQuery = FirebaseFirestore.instance
-        .collection('tickets')
-        .where('userId', isEqualTo: userId)
-        .where('isScanned', isEqualTo: true);
-
-    _testCheckedInTicketsSubscription = ticketQuery.snapshots().listen((snapshot) {
-      _syncTestTourAnnouncementListeners(snapshot.docs);
-    });
-  }
-
-  void _syncTestTourAnnouncementListeners(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
-    final activeTourIds = <String>{};
-    for (final doc in docs) {
-      final data = doc.data();
-      final status = data['status']?.toString().toLowerCase() ?? '';
-      if (status == 'cancelled') continue;
-
-      final tourId = data['tourId']?.toString().trim() ?? '';
-      if (tourId.isNotEmpty) {
-        activeTourIds.add(tourId);
-      }
-    }
-
-    final toRemove = _testTourAnnouncementSubscriptions.keys
-        .where((tourId) => !activeTourIds.contains(tourId))
-        .toList();
-
-    for (final tourId in toRemove) {
-      _testTourAnnouncementSubscriptions[tourId]?.cancel();
-      _testTourAnnouncementSubscriptions.remove(tourId);
-    }
-
-    for (final tourId in activeTourIds) {
-      if (_testTourAnnouncementSubscriptions.containsKey(tourId)) continue;
-      _testTourAnnouncementSubscriptions[tourId] = FirebaseFirestore.instance
-          .collection('tours')
-          .doc(tourId)
-          .collection('announcements')
-          .orderBy('createdAt', descending: true)
-          .limit(50)
-          .snapshots()
-          .listen((announcementSnapshot) {
-            _handleTestAnnouncementSnapshot(tourId, announcementSnapshot);
-          });
-    }
-  }
-
-  Future<void> _handleTestAnnouncementSnapshot(
-    String tourId,
-    QuerySnapshot<Map<String, dynamic>> snapshot,
-  ) async {
-    for (final change in snapshot.docChanges) {
-      if (change.type != DocumentChangeType.added) continue;
-
-      final data = change.doc.data();
-      if (data == null) continue;
-
-      final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
-      if (createdAt != null && createdAt.isBefore(_sessionStartedAt)) {
-        continue;
-      }
-
-      final message = data['notification']?.toString().trim() ?? '';
-      if (message.isEmpty) continue;
-
-      final notificationKey = 'test_fallback_ann_${tourId}_${change.doc.id}';
-      if (_shownNotificationIds.contains(notificationKey)) continue;
-      _shownNotificationIds.add(notificationKey);
-
-      await _showSystemNotification(
-        notificationKey.hashCode & 0x7fffffff,
-        'Tur Bildirim (Test)',
-        message,
-      );
-    }
-  }
-
-  Future<void> _cancelAllTestAnnouncementSubscriptions() async {
-    for (final sub in _testTourAnnouncementSubscriptions.values) {
-      await sub.cancel();
-    }
-    _testTourAnnouncementSubscriptions.clear();
-  }
-
-  Future<void> _syncFcmToken(String? userId) async {
-    if (userId == null || userId.isEmpty) return;
-    String? token;
-    try {
-      token = await FirebaseMessaging.instance.getToken();
-    } catch (_) {
-      return;
-    }
-    if (token == null || token.isEmpty) return;
-    await _saveFcmToken(userId, token);
   }
 
   Future<void> _saveFcmToken(String userId, String token) async {
@@ -276,7 +181,7 @@ class LocalNotificationService {
     const androidDetails = AndroidNotificationDetails(
       'turassist_announcements',
       'TurAssist Duyurular',
-      channelDescription: 'Tur sorumlusu duyuruları ve tur bildirimleri ($_testFallbackTag)',
+      channelDescription: 'Tur sorumlusu duyuruları ve tur bildirimleri',
       importance: Importance.max,
       priority: Priority.high,
       playSound: true,

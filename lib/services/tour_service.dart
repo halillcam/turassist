@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/tour_model.dart';
 import '../models/tour_program_model.dart';
+import '../models/user_model.dart';
 
 /// Tur verilerini Firestore üzerinden yöneten servis.
 ///
@@ -173,30 +174,95 @@ class TourService {
     }
   }
 
-  /// Tur bitirme talebini Firestore'a kaydeder; tüm QR token'larını geçersizleştirir.
-  ///
-  /// Tur durumu 'finish_requested' olarak işaretlenir.
-  /// Admin / Web paneli bu talebi görerek turu kapatır.
-  Future<void> finishTour(String tourId, String guideId) async {
+  /// Rehberin ilgili tur için bekleyen bir bitirme talebi olup olmadığını kontrol eder.
+  Future<bool> hasPendingTourCompletionRequest({
+    required String tourId,
+    required String guideId,
+  }) async {
     try {
-      // Bitirme talebi oluştur
-      await _firestore.collection('tours').doc(tourId).update({
-        'status': 'finish_requested',
-        'finishRequestedBy': guideId,
-        'finishRequestedAt': FieldValue.serverTimestamp(),
-      });
+      if (tourId.trim().isEmpty || guideId.trim().isEmpty) return false;
 
-      // Bu turun tüm biletlerinin QR token'ını geçersizleştir
-      final tickets = await _firestore
-          .collection('tickets')
+      final snapshot = await _firestore
+          .collection('tourCompletionRequests')
           .where('tourId', isEqualTo: tourId)
+          .where('guideId', isEqualTo: guideId)
+          .where('isApproved', isEqualTo: false)
+          .limit(1)
           .get();
 
-      for (final doc in tickets.docs) {
-        await doc.reference.update({'qrToken': null, 'isScanned': true});
-      }
+      return snapshot.docs.isNotEmpty;
+    } on FirebaseException catch (e) {
+      debugPrint('TourService.hasPendingTourCompletionRequest FirebaseException: ${e.code}');
+      rethrow;
     } catch (e) {
-      debugPrint('TourService.finishTour Error: $e');
+      debugPrint('TourService.hasPendingTourCompletionRequest Error: $e');
+      rethrow;
     }
   }
+
+  /// Guide için tur bitirme onay talebi oluşturur.
+  ///
+  /// Mobil uygulama turu pasife çekmez; yalnızca admin onayı için
+  /// `tourCompletionRequests` koleksiyonuna kayıt açar.
+  Future<void> requestTourCompletion({required String tourId, required String guideId}) async {
+    try {
+      final normalizedTourId = tourId.trim();
+      final normalizedGuideId = guideId.trim();
+
+      if (normalizedTourId.isEmpty || normalizedGuideId.isEmpty) {
+        throw Exception('invalid-tour-completion-request');
+      }
+
+      final guideDoc = await _firestore.collection('users').doc(normalizedGuideId).get();
+      if (!guideDoc.exists) {
+        throw Exception('guide-profile-not-found');
+      }
+
+      final guide = UserModel.fromFirestore(guideDoc);
+      if (guide.role.trim().toLowerCase() != 'guide') {
+        throw Exception('only-guide-can-request-tour-completion');
+      }
+
+      final tourDoc = await _firestore.collection('tours').doc(normalizedTourId).get();
+      if (!tourDoc.exists) {
+        throw Exception('tour-not-found');
+      }
+
+      final tour = TourModel.fromFirestore(tourDoc);
+      if (tour.isDeleted) {
+        throw Exception('tour-already-inactive');
+      }
+
+      if (tour.guideId.trim() != normalizedGuideId) {
+        throw Exception('guide-not-assigned-to-this-tour');
+      }
+
+      final hasPendingRequest = await hasPendingTourCompletionRequest(
+        tourId: normalizedTourId,
+        guideId: normalizedGuideId,
+      );
+      if (hasPendingRequest) {
+        throw Exception('tour-completion-request-already-exists');
+      }
+
+      await _firestore.collection('tourCompletionRequests').add({
+        'tourId': tour.id,
+        'tourTitle': tour.title,
+        'guideId': normalizedGuideId,
+        'companyId': tour.companyId,
+        'isApproved': false,
+        'requestedAt': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (e) {
+      debugPrint('TourService.requestTourCompletion FirebaseException: ${e.code}');
+      rethrow;
+    } catch (e) {
+      debugPrint('TourService.requestTourCompletion Error: $e');
+      rethrow;
+    }
+  }
+
+  /// Geriye dönük uyumluluk için korunur; artık doğrudan turu bitirmez.
+  Future<void> finishTour(String tourId, String guideId) =>
+      requestTourCompletion(tourId: tourId, guideId: guideId);
 }

@@ -136,7 +136,7 @@ class TourController extends GetxController {
   Future<void> finishTour(String tourId, String guideId) async {
     try {
       isLoading.value = true;
-      await _firebaseService.finishTour(tourId, guideId);
+      await _firebaseService.requestTourCompletion(tourId: tourId, guideId: guideId);
     } catch (e) {
       debugPrint('Turu bitirirken hata: $e');
     } finally {

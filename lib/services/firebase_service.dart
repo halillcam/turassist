@@ -95,9 +95,17 @@ class FirebaseService {
   Future<List<Map<String, dynamic>>> getTourParticipants(String tourId) =>
       _tourService.getTourParticipants(tourId);
 
+  /// Rehberin bekleyen tur bitirme talebini kontrol eder.
+  Future<bool> hasPendingTourCompletionRequest({required String tourId, required String guideId}) =>
+      _tourService.hasPendingTourCompletionRequest(tourId: tourId, guideId: guideId);
+
+  /// Tur bitirme onay talebi oluşturur.
+  Future<void> requestTourCompletion({required String tourId, required String guideId}) =>
+      _tourService.requestTourCompletion(tourId: tourId, guideId: guideId);
+
   /// Tur bitirme talebi oluşturur.
   Future<void> finishTour(String tourId, String guideId) =>
-      _tourService.finishTour(tourId, guideId);
+      _tourService.requestTourCompletion(tourId: tourId, guideId: guideId);
 
   //  TicketService delegates
 

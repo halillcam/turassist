@@ -49,10 +49,39 @@ class MyToursController extends GetxController {
     super.onClose();
   }
 
+  bool _isTicketCheckedIn(TicketModel ticket) {
+    if (!ticket.isScanned) return false;
+    final cachedTour = ticketTours[ticket.tourId];
+    if (cachedTour?.isDeleted == true) return false;
+    return true;
+  }
+
+  bool _isPastTicket(TicketModel ticket) {
+    final status = ticket.status.toLowerCase();
+    final cachedTour = ticketTours[ticket.tourId];
+
+    if (status == 'completed' || status == 'cancelled') return true;
+    if (status == 'checked_in' && !ticket.isScanned) return true;
+    if (cachedTour?.isDeleted == true) return true;
+
+    return false;
+  }
+
+  Future<void> _refreshTicketTours(List<TicketModel> sourceTickets) async {
+    for (final ticket in sourceTickets) {
+      final tour = await _firebaseService.getTourById(ticket.tourId);
+      if (tour != null) {
+        ticketTours[ticket.tourId] = tour;
+      } else {
+        ticketTours.remove(ticket.tourId);
+      }
+    }
+  }
+
   /// Bilet listesinden checked_in durumunu değerlendirir.
   /// Stream listener veya `ever()` watcher tarafından tetiklenir.
   void _evaluateCheckedInState() {
-    final checkedIn = tickets.where((t) => t.status == 'checked_in' || t.isScanned).toList();
+    final checkedIn = tickets.where(_isTicketCheckedIn).toList();
 
     if (checkedIn.isNotEmpty) {
       final incoming = checkedIn.first;
@@ -89,15 +118,8 @@ class MyToursController extends GetxController {
         // ve checked_in durumu HEMEN değerlendirilir (await beklemeden).
         tickets.assignAll(updatedTickets);
 
-        // Tur bilgilerini arka planda cache'le
-        for (final ticket in updatedTickets) {
-          if (!ticketTours.containsKey(ticket.tourId)) {
-            final tour = await _firebaseService.getTourById(ticket.tourId);
-            if (tour != null) {
-              ticketTours[ticket.tourId] = tour;
-            }
-          }
-        }
+        await _refreshTicketTours(updatedTickets);
+        _evaluateCheckedInState();
 
         // Stream ilk veriyi getirdiğinde loading'i kapat
         if (isLoading.value) {
@@ -125,22 +147,17 @@ class MyToursController extends GetxController {
       debugPrint('LOAD_DATA: ${userTickets.length} bilet bulundu');
       tickets.assignAll(userTickets);
 
-      // checked_in veya isScanned olan bilet varsa aktif tur olarak yükle
-      final checkedIn = userTickets.where((t) => t.status == 'checked_in' || t.isScanned).toList();
+      await _refreshTicketTours(userTickets);
+
+      // QR okutulmuş ve halen aktif kabul edilen bilet varsa detay görünümünü aç
+      final checkedIn = userTickets.where(_isTicketCheckedIn).toList();
       if (checkedIn.isNotEmpty) {
         checkedInTicket.value = checkedIn.first;
         await _loadActiveTourDetail(checkedIn.first.tourId);
       }
 
-      // Her biletin tur bilgisini cache'le
-      for (final ticket in userTickets) {
-        if (!ticketTours.containsKey(ticket.tourId)) {
-          final tour = await _firebaseService.getTourById(ticket.tourId);
-          if (tour != null) {
-            ticketTours[ticket.tourId] = tour;
-            debugPrint('LOAD_DATA: Tur cache\'lendi → ${tour.title}');
-          }
-        }
+      for (final tour in ticketTours.values) {
+        debugPrint('LOAD_DATA: Tur cache\'lendi → ${tour.title}');
       }
 
       debugPrint('═══ LOAD_DATA: Tamamlandı ═══');
@@ -154,22 +171,28 @@ class MyToursController extends GetxController {
 
   Future<void> _loadActiveTourDetail(String tourId) async {
     final tour = await _firebaseService.getTourById(tourId);
-    if (tour != null) {
-      activeTour.value = tour;
-      final program = await _firebaseService.getTourProgram(tourId);
-      programDays.assignAll(program);
+    if (tour == null || tour.isDeleted) {
+      checkedInTicket.value = null;
+      activeTour.value = null;
+      programDays.clear();
+      return;
     }
+
+    ticketTours[tourId] = tour;
+    activeTour.value = tour;
+    final program = await _firebaseService.getTourProgram(tourId);
+    programDays.assignAll(program);
   }
 
   /// Aktif (checked_in) bilet var mı?
   bool get hasCheckedIn => checkedInTicket.value != null;
 
   /// Yaklaşan turlar: 'active' durumundaki biletler.
-  List<TicketModel> get upcomingTickets => tickets.where((t) => t.status == 'active').toList();
+  List<TicketModel> get upcomingTickets =>
+      tickets.where((t) => t.status == 'active' && !_isPastTicket(t)).toList();
 
   /// Geçmiş turlar: 'completed' veya 'cancelled' durumundaki biletler.
-  List<TicketModel> get pastTickets =>
-      tickets.where((t) => t.status == 'completed' || t.status == 'cancelled').toList();
+  List<TicketModel> get pastTickets => tickets.where(_isPastTicket).toList();
 
   Future<void> cancelUpcomingTicket(TicketModel ticket) async {
     if (ticket.status != 'active') {
@@ -212,6 +235,7 @@ class MyToursController extends GetxController {
         isScanned: old.isScanned,
         purchaseDate: old.purchaseDate,
         scannedAt: old.scannedAt,
+        departureDate: old.departureDate,
       );
       tickets.refresh();
     }
@@ -260,6 +284,7 @@ class MyToursController extends GetxController {
       isScanned: qrUpdateOk ? true : ticket.isScanned,
       purchaseDate: ticket.purchaseDate,
       scannedAt: DateTime.now(),
+      departureDate: ticket.departureDate,
     );
 
     final index = tickets.indexWhere((item) => item.id == ticket.id);
