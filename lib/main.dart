@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config/app_routes.dart';
 import 'config/app_theme.dart';
 import 'firebase_options.dart';
-import 'services/local_notification_service.dart';
+import 'core/services/local_notification_service.dart';
 
 bool get _supportsFirebaseMessaging {
   if (kIsWeb) return true;

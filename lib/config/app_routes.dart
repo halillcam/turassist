@@ -1,25 +1,24 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../screens/auth/email_verification_screen.dart';
-import '../screens/auth/forgot_password_screen.dart';
-import '../screens/auth/login_screen.dart';
-import '../screens/auth/signup_screen.dart';
-import '../screens/chat/chat_screen.dart';
-import '../screens/city/city_choice_screen.dart';
-import '../screens/my_tours/my_tours_screen.dart';
-import '../screens/my_tours/tour_announcements_screen.dart';
-import '../screens/profile/profile_screen.dart';
-import '../screens/qr/my_qr_screen.dart';
-import '../screens/qr/qr_scanner_screen.dart';
-import '../models/tour_model.dart';
-import '../screens/tour/tour_detail_screen.dart';
-import '../screens/tour/tour_list_screen.dart';
-import '../screens/tour_manager/tour_manager_announcements_screen.dart';
-import '../screens/tour_manager/tour_manager_chat_screen.dart';
-import '../screens/tour_manager/tour_manager_customers_screen.dart';
-import '../screens/tour_manager/tour_manager_home_screen.dart';
-import '../screens/tour_manager/tour_manager_login_screen.dart';
+import '../features/announcements/presentation/screens/customer_announcements_screen.dart';
+import '../features/announcements/presentation/screens/guide_announcements_screen.dart';
+import '../features/auth/presentation/screens/email_verification_screen.dart';
+import '../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../features/auth/presentation/screens/guide_login_screen.dart';
+import '../features/auth/presentation/screens/login_screen.dart';
+import '../features/auth/presentation/screens/signup_screen.dart';
+import '../features/chat/presentation/screens/customer_chat_screen.dart';
+import '../features/chat/presentation/screens/guide_chat_screen.dart';
+import '../features/city_choice/presentation/screens/city_choice_screen.dart';
+import '../features/guide/presentation/screens/guide_dashboard_screen.dart';
+import '../features/guide/presentation/screens/guide_participants_screen.dart';
+import '../features/guide/presentation/screens/guide_qr_scanner_screen.dart';
+import '../features/profile/presentation/screens/profile_screen.dart';
+import '../features/qr/presentation/screens/my_qr_screen.dart';
+import '../features/tours/presentation/screens/my_tours_screen.dart';
+import '../features/tours/presentation/screens/tour_detail_screen.dart';
+import '../features/tours/presentation/screens/tour_list_screen.dart';
+import '../core/models/tour_model.dart';
 
 /// Uygulama içi rota sabitleri.
 abstract class AppRoutes {
@@ -64,7 +63,7 @@ class AppPages {
     ),
     GetPage(
       name: AppRoutes.guideLogin,
-      page: () => const TourManagerLoginScreen(),
+      page: () => const GuideLoginScreen(),
       transition: Transition.fadeIn,
     ),
     GetPage(
@@ -74,7 +73,7 @@ class AppPages {
     ),
     GetPage(
       name: AppRoutes.guideDashboard,
-      page: () => const TourManagerHomeScreen(),
+      page: () => const GuideDashboardScreen(),
       transition: Transition.fadeIn,
     ),
     GetPage(
@@ -104,37 +103,37 @@ class AppPages {
     ),
     GetPage(
       name: AppRoutes.tourManagerHome,
-      page: () => const TourManagerHomeScreen(),
+      page: () => const GuideDashboardScreen(),
       transition: Transition.fadeIn,
     ),
     GetPage(
       name: AppRoutes.tourManagerAnnouncements,
-      page: () => const TourManagerAnnouncementsScreen(),
+      page: () => const GuideAnnouncementsScreen(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
       name: AppRoutes.qrScanner,
-      page: () => const QrScannerScreen(),
+      page: () => const GuideQrScannerScreen(),
       transition: Transition.downToUp,
     ),
     GetPage(
       name: AppRoutes.tourManagerChat,
-      page: () => const TourManagerChatScreen(),
+      page: () => const GuideChatScreen(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
       name: AppRoutes.tourManagerCustomers,
-      page: () => const TourManagerCustomersScreen(),
+      page: () => const GuideParticipantsScreen(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
       name: AppRoutes.chat,
-      page: () => const ChatScreen(),
+      page: () => const CustomerChatScreen(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
       name: AppRoutes.tourAnnouncements,
-      page: () => const TourAnnouncementsScreen(),
+      page: () => const CustomerAnnouncementsScreen(),
       transition: Transition.rightToLeft,
     ),
   ];

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../config/colors.dart';
-import '../models/tour_model.dart';
+import '../core/models/tour_model.dart';
 
 class TourCard extends StatelessWidget {
   final TourModel tour;
