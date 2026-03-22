@@ -114,7 +114,10 @@ class _GuideDashboardScreenState extends State<GuideDashboardScreen> {
                       icon: Icons.campaign_outlined,
                       title: 'Duyurular',
                       subtitle: 'Sadece guide gönderir',
-                      onTap: () => Get.toNamed(AppRoutes.tourManagerAnnouncements),
+                      onTap: () => Get.toNamed(
+                        AppRoutes.tourManagerAnnouncements,
+                        arguments: {'tourId': dashboard.tourId, 'tourTitle': dashboard.tourTitle},
+                      ),
                     ),
                     GuideActionTile(
                       icon: Icons.qr_code_scanner_rounded,

@@ -13,6 +13,40 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, Tar
 ///   options: DefaultFirebaseOptions.currentPlatform,
 /// );
 /// ```
+class _FirebaseEnv {
+  static const String webApiKey = String.fromEnvironment('FIREBASE_WEB_API_KEY');
+  static const String webAppId = String.fromEnvironment('FIREBASE_WEB_APP_ID');
+  static const String webAuthDomain = String.fromEnvironment('FIREBASE_WEB_AUTH_DOMAIN');
+  static const String webMeasurementId = String.fromEnvironment('FIREBASE_WEB_MEASUREMENT_ID');
+  static const String androidApiKey = String.fromEnvironment('FIREBASE_ANDROID_API_KEY');
+  static const String androidAppId = String.fromEnvironment('FIREBASE_ANDROID_APP_ID');
+  static const String iosApiKey = String.fromEnvironment('FIREBASE_IOS_API_KEY');
+  static const String iosAppId = String.fromEnvironment('FIREBASE_IOS_APP_ID');
+  static const String iosBundleId = String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID');
+  static const String macosApiKey = String.fromEnvironment('FIREBASE_MACOS_API_KEY');
+  static const String macosAppId = String.fromEnvironment('FIREBASE_MACOS_APP_ID');
+  static const String macosBundleId = String.fromEnvironment('FIREBASE_MACOS_BUNDLE_ID');
+  static const String windowsApiKey = String.fromEnvironment('FIREBASE_WINDOWS_API_KEY');
+  static const String windowsAppId = String.fromEnvironment('FIREBASE_WINDOWS_APP_ID');
+  static const String windowsAuthDomain = String.fromEnvironment('FIREBASE_WINDOWS_AUTH_DOMAIN');
+  static const String windowsMeasurementId = String.fromEnvironment(
+    'FIREBASE_WINDOWS_MEASUREMENT_ID',
+  );
+  static const String messagingSenderId = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
+  static const String projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+  static const String storageBucket = String.fromEnvironment('FIREBASE_STORAGE_BUCKET');
+
+  static String requireValue(String key, String value) {
+    if (value.isEmpty) {
+      throw StateError(
+        'Missing Firebase config for $key. '
+        'Provide it with --dart-define or --dart-define-from-file.',
+      );
+    }
+    return value;
+  }
+}
+
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -37,49 +71,73 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDs-z7FSBZbIePCAR9ksfTEvq8URHt04ss',
-    appId: '1:138121353976:web:71fbe6949f5f96558f790d',
-    messagingSenderId: '138121353976',
-    projectId: 'turassist-6fdc8',
-    authDomain: 'turassist-6fdc8.firebaseapp.com',
-    storageBucket: 'turassist-6fdc8.firebasestorage.app',
-    measurementId: 'G-8H3205PE1M',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: _FirebaseEnv.requireValue('FIREBASE_WEB_API_KEY', _FirebaseEnv.webApiKey),
+    appId: _FirebaseEnv.requireValue('FIREBASE_WEB_APP_ID', _FirebaseEnv.webAppId),
+    messagingSenderId: _FirebaseEnv.requireValue(
+      'FIREBASE_MESSAGING_SENDER_ID',
+      _FirebaseEnv.messagingSenderId,
+    ),
+    projectId: _FirebaseEnv.requireValue('FIREBASE_PROJECT_ID', _FirebaseEnv.projectId),
+    authDomain: _FirebaseEnv.requireValue('FIREBASE_WEB_AUTH_DOMAIN', _FirebaseEnv.webAuthDomain),
+    storageBucket: _FirebaseEnv.requireValue('FIREBASE_STORAGE_BUCKET', _FirebaseEnv.storageBucket),
+    measurementId: _FirebaseEnv.requireValue(
+      'FIREBASE_WEB_MEASUREMENT_ID',
+      _FirebaseEnv.webMeasurementId,
+    ),
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAE9TEDgudXAWBnrNR_c3lrZdnNRrRZpRA',
-    appId: '1:138121353976:android:f633c63a1143590f8f790d',
-    messagingSenderId: '138121353976',
-    projectId: 'turassist-6fdc8',
-    storageBucket: 'turassist-6fdc8.firebasestorage.app',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: _FirebaseEnv.requireValue('FIREBASE_ANDROID_API_KEY', _FirebaseEnv.androidApiKey),
+    appId: _FirebaseEnv.requireValue('FIREBASE_ANDROID_APP_ID', _FirebaseEnv.androidAppId),
+    messagingSenderId: _FirebaseEnv.requireValue(
+      'FIREBASE_MESSAGING_SENDER_ID',
+      _FirebaseEnv.messagingSenderId,
+    ),
+    projectId: _FirebaseEnv.requireValue('FIREBASE_PROJECT_ID', _FirebaseEnv.projectId),
+    storageBucket: _FirebaseEnv.requireValue('FIREBASE_STORAGE_BUCKET', _FirebaseEnv.storageBucket),
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBQi45pOdLuVx7doWBGAf2LNTTk5jWnaWg',
-    appId: '1:138121353976:ios:2070d94401d0dd328f790d',
-    messagingSenderId: '138121353976',
-    projectId: 'turassist-6fdc8',
-    storageBucket: 'turassist-6fdc8.firebasestorage.app',
-    iosBundleId: 'com.natanzdev.turassist',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: _FirebaseEnv.requireValue('FIREBASE_IOS_API_KEY', _FirebaseEnv.iosApiKey),
+    appId: _FirebaseEnv.requireValue('FIREBASE_IOS_APP_ID', _FirebaseEnv.iosAppId),
+    messagingSenderId: _FirebaseEnv.requireValue(
+      'FIREBASE_MESSAGING_SENDER_ID',
+      _FirebaseEnv.messagingSenderId,
+    ),
+    projectId: _FirebaseEnv.requireValue('FIREBASE_PROJECT_ID', _FirebaseEnv.projectId),
+    storageBucket: _FirebaseEnv.requireValue('FIREBASE_STORAGE_BUCKET', _FirebaseEnv.storageBucket),
+    iosBundleId: _FirebaseEnv.requireValue('FIREBASE_IOS_BUNDLE_ID', _FirebaseEnv.iosBundleId),
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBQi45pOdLuVx7doWBGAf2LNTTk5jWnaWg',
-    appId: '1:138121353976:ios:2070d94401d0dd328f790d',
-    messagingSenderId: '138121353976',
-    projectId: 'turassist-6fdc8',
-    storageBucket: 'turassist-6fdc8.firebasestorage.app',
-    iosBundleId: 'com.natanzdev.turassist',
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: _FirebaseEnv.requireValue('FIREBASE_MACOS_API_KEY', _FirebaseEnv.macosApiKey),
+    appId: _FirebaseEnv.requireValue('FIREBASE_MACOS_APP_ID', _FirebaseEnv.macosAppId),
+    messagingSenderId: _FirebaseEnv.requireValue(
+      'FIREBASE_MESSAGING_SENDER_ID',
+      _FirebaseEnv.messagingSenderId,
+    ),
+    projectId: _FirebaseEnv.requireValue('FIREBASE_PROJECT_ID', _FirebaseEnv.projectId),
+    storageBucket: _FirebaseEnv.requireValue('FIREBASE_STORAGE_BUCKET', _FirebaseEnv.storageBucket),
+    iosBundleId: _FirebaseEnv.requireValue('FIREBASE_MACOS_BUNDLE_ID', _FirebaseEnv.macosBundleId),
   );
 
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDs-z7FSBZbIePCAR9ksfTEvq8URHt04ss',
-    appId: '1:138121353976:web:ffa81bbc3d952fa58f790d',
-    messagingSenderId: '138121353976',
-    projectId: 'turassist-6fdc8',
-    authDomain: 'turassist-6fdc8.firebaseapp.com',
-    storageBucket: 'turassist-6fdc8.firebasestorage.app',
-    measurementId: 'G-39GSZ2XHFY',
+  static FirebaseOptions get windows => FirebaseOptions(
+    apiKey: _FirebaseEnv.requireValue('FIREBASE_WINDOWS_API_KEY', _FirebaseEnv.windowsApiKey),
+    appId: _FirebaseEnv.requireValue('FIREBASE_WINDOWS_APP_ID', _FirebaseEnv.windowsAppId),
+    messagingSenderId: _FirebaseEnv.requireValue(
+      'FIREBASE_MESSAGING_SENDER_ID',
+      _FirebaseEnv.messagingSenderId,
+    ),
+    projectId: _FirebaseEnv.requireValue('FIREBASE_PROJECT_ID', _FirebaseEnv.projectId),
+    authDomain: _FirebaseEnv.requireValue(
+      'FIREBASE_WINDOWS_AUTH_DOMAIN',
+      _FirebaseEnv.windowsAuthDomain,
+    ),
+    storageBucket: _FirebaseEnv.requireValue('FIREBASE_STORAGE_BUCKET', _FirebaseEnv.storageBucket),
+    measurementId: _FirebaseEnv.requireValue(
+      'FIREBASE_WINDOWS_MEASUREMENT_ID',
+      _FirebaseEnv.windowsMeasurementId,
+    ),
   );
 }

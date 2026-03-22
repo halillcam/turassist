@@ -65,22 +65,6 @@ class AnnouncementRemoteDataSource {
     if (sender.role != 'guide') {
       throw Exception('Duyuru sadece tur sorumlusu tarafından gönderilebilir.');
     }
-
-    final checkedInTickets = await _firestore
-        .collection('tickets')
-        .where('tourId', isEqualTo: tourId)
-        .where('isScanned', isEqualTo: true)
-        .get();
-
-    final recipientIds = <String>{};
-    for (final ticket in checkedInTickets.docs) {
-      final userId = ticket.data()['userId']?.toString().trim() ?? '';
-      if (userId.isNotEmpty) {
-        recipientIds.add(userId);
-      }
-    }
-
-    final batch = _firestore.batch();
     final announcementRef = _firestore
         .collection('tours')
         .doc(tourId)
@@ -96,28 +80,6 @@ class AnnouncementRemoteDataSource {
       senderName: sender.fullName,
     );
 
-    batch.set(announcementRef, announcement.toAnnouncementJson());
-
-    for (final userId in recipientIds) {
-      final notificationRef = _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('notifications')
-          .doc();
-
-      batch.set(notificationRef, {
-        'title': 'Tur Duyurusu',
-        'message': message,
-        'tourId': tourId,
-        'scope': 'checked_in_only',
-        'senderRole': sender.role,
-        'senderName': sender.fullName,
-        'announcementId': announcementRef.id,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isRead': false,
-      });
-    }
-
-    await batch.commit();
+    await announcementRef.set(announcement.toAnnouncementJson());
   }
 }

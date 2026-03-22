@@ -8,6 +8,7 @@ class AnnouncementComposeCard extends StatelessWidget {
     required this.controller,
     required this.maxLength,
     required this.isSubmitting,
+    required this.canSend,
     required this.onChanged,
     required this.onSend,
   });
@@ -15,6 +16,7 @@ class AnnouncementComposeCard extends StatelessWidget {
   final TextEditingController controller;
   final int maxLength;
   final bool isSubmitting;
+  final bool canSend;
   final ValueChanged<String> onChanged;
   final VoidCallback onSend;
 
@@ -72,7 +74,7 @@ class AnnouncementComposeCard extends StatelessWidget {
             width: double.infinity,
             height: 52,
             child: ElevatedButton.icon(
-              onPressed: isSubmitting || textLength == 0 ? null : onSend,
+              onPressed: isSubmitting || !canSend ? null : onSend,
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
               icon: isSubmitting
                   ? const SizedBox(

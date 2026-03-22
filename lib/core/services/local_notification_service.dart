@@ -22,7 +22,11 @@ class LocalNotificationService {
   final Set<String> _shownNotificationIds = <String>{};
   DateTime _sessionStartedAt = DateTime.now();
   bool _initialized = false;
-  static const bool _enableFcmTokenSync = false;
+  static const bool _enableFcmTokenSync = true;
+
+  bool get _shouldMirrorFirestoreNotificationsLocally {
+    return !_supportsFirebaseMessaging || !_enableFcmTokenSync;
+  }
 
   bool get _supportsFirebaseMessaging {
     if (kIsWeb) return true;
@@ -96,10 +100,12 @@ class LocalNotificationService {
     _authSubscription?.cancel();
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) async {
       await _subscribeToUserNotifications(user?.uid);
+      await _syncCurrentFcmToken(user?.uid);
     });
 
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
     _subscribeToUserNotifications(currentUid);
+    _syncCurrentFcmToken(currentUid);
 
     _fcmTokenRefreshSubscription?.cancel();
     if (!_supportsFirebaseMessaging || !_enableFcmTokenSync) {
@@ -113,6 +119,22 @@ class LocalNotificationService {
         _saveFcmToken(uid, token);
       }
     });
+  }
+
+  Future<void> _syncCurrentFcmToken(String? userId) async {
+    if (!_supportsFirebaseMessaging || !_enableFcmTokenSync) {
+      return;
+    }
+    if (userId == null || userId.isEmpty) {
+      return;
+    }
+
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.trim().isNotEmpty) {
+        await _saveFcmToken(userId, token.trim());
+      }
+    } catch (_) {}
   }
 
   Future<void> _saveFcmToken(String userId, String token) async {
@@ -154,6 +176,10 @@ class LocalNotificationService {
 
           final isRead = data['isRead'] == true;
           if (isRead) continue;
+
+          if (!_shouldMirrorFirestoreNotificationsLocally) {
+            continue;
+          }
 
           final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
           if (createdAt != null && createdAt.isBefore(_sessionStartedAt)) {
