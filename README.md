@@ -1,39 +1,65 @@
-# turassist
+# TurAssist Mobil Uygulama
 
-A new Flutter project.
+TurAssist Mobil Uygulaması, tur sorumlularının ve Müşterilerin tur süreçlerini sahada kolay ve hızlı bir şekilde yönetebilmesi için geliştirilmiş mobil tabanlı bir uygulamadır.
 
-## Getting Started
+Uygulama, web panel ile entegre çalışarak tur operasyonlarının mobil cihazlar üzerinden yönetilmesini sağlar.
 
-This project is a starting point for a Flutter application.
+## Genel Bakış
 
-A few resources to get you started if this is your first Flutter project:
+TurAssist mobil uygulaması, tur günü yaşanan operasyonel karmaşıklığı azaltmak amacıyla geliştirilmiştir.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Tur sorumluları ve kullanıcılar uygulama üzerinden:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Tur bilgilerine erişebilir
+- Katılımcı süreçlerini yönetebilir
+- Gerçek zamanlı operasyon takibi yapabilir
 
-## Tour manager notifications (QR checked-in only)
+## Özellikler
+- QR Kod ile Katılımcı Doğrulama
+- Katılımcılar QR kod ile doğrulanır
+- Manuel kontrol ihtiyacı azaltılır
+- Hızlı ve güvenli giriş işlemi sağlanır
+- Tur Operasyon Yönetimi
+- Tur sorumluları aktif turları görüntüleyebilir
+- Katılımcı listelerini kontrol edebilir
+- Tur sürecini mobil cihaz üzerinden yönetebilir
+- Kullanıcılar satın aldıkları turları görüntüleyebilir
+- Katılımcı bilgileri mobil ortamda takip edilebilir
+- Bildirim Sistemi
+- Duyuru ve mesajlar anlık olarak iletilir
+- Tur ile ilgili gelişmeler kullanıcıya doğrudan ulaşır
+- Gerçek Zamanlı Senkronizasyon
+- Web panel ile senkronize çalışır
+- Tüm veriler anlık olarak güncellenir
 
-This project sends tour announcements only to users who have scanned their QR for the assigned tour.
+## Mimari
+Mobil uygulama, katmanlı mimari prensiplerine uygun olarak geliştirilmiştir:
 
-### Data flow
+- Presentation katmanı (UI ve state yönetimi)
+- Domain katmanı 
+- Data katmanı (veri erişimi ve servisler)
 
-- Mobile app saves FCM token into `users/{uid}.fcmTokens`.
-- Tour manager announcement writes into `tours/{tourId}/announcements`.
-- Cloud Function `fanoutAnnouncementToCheckedInParticipants` creates `users/{uid}/notifications` only for tickets where `tickets.isScanned == true`.
-- Cloud Function `sendPushForUserNotification` triggers on new notification docs and sends FCM push.
-- Function verifies `tickets` again (`tourId + userId + isScanned=true`) before sending.
+Bu yapı, kodun sürdürülebilirliğini ve test edilebilirliğini artırır.
 
-### Deploy Cloud Functions
+## Kullanılan Teknolojiler
+- Flutter
+- Firebase Authentication
+- Cloud Firestore
+- Firebase Cloud Messaging
 
-1. Install Firebase CLI and login:
-	- `npm install -g firebase-tools`
-	- `firebase login`
-2. From repository root install dependencies:
-	- `cd functions`
-	- `npm install`
-3. Deploy:
-	- `firebase deploy --only functions`
+
+Kullanıcı kimlik doğrulama işlemleri Firebase Authentication ile sağlanmaktadır.
+Veri erişimi, Firestore Security Rules ile rol bazlı olarak kontrol edilmektedir.
+
+Her kullanıcı yalnızca yetkili olduğu verilere erişebilir.
+
+## Demo
+
+Uygulamanın demo videosuna aşağıdaki bağlantı üzerinden ulaşabilirsiniz:
+
+ <img width="25" height="25" alt="image" src="https://github.com/user-attachments/assets/28709666-bc02-44a9-8910-de944bb10971" /> https://youtu.be/60JbPzEaCYA
+
+
+## Not
+
+Bu uygulama, tur operasyonlarının sahada daha hızlı, kontrollü ve dijital bir şekilde yönetilebilmesi amacıyla geliştirilmiştir.
